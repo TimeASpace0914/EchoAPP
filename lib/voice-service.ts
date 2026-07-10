@@ -1,19 +1,24 @@
 /**
  * 語音生成服務
  *
- * 此模組封裝了語音克隆的推理邏輯。
- * 目前為模擬實作，未來整合 Qwen3-TTS / ExecuTorch 本地模型時，
- * 僅需替換 `generateSpeech` 內部邏輯，上層介面不變。
+ * 整合 Voicebox 開源語音克隆軟件的 REST API。
+ * Voicebox 需在電腦上運行（http://localhost:17493），
+ * 本 APP 透過後端伺服器代理呼叫 Voicebox API。
+ *
+ * 若 Voicebox 未連線，則回退至模擬音檔（供測試用）。
  */
 
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
+import { getApiBaseUrl } from "@/constants/oauth";
 
 export interface VoiceGenerationParams {
   /** 參考音檔 URI（親友生前音檔） */
   referenceAudioUri: string;
   /** 要生成的文字內容 */
   text: string;
+  /** Voicebox 聲音檔案 ID（若已建立） */
+  voiceProfileId?: string;
   /** 生成進度回調（0-100） */
   onProgress?: (progress: number, stage: string) => void;
 }
@@ -25,6 +30,8 @@ export interface VoiceGenerationResult {
   duration: number;
   /** 生成時間戳 */
   createdAt: number;
+  /** 是否使用 Voicebox 真實生成 */
+  isRealVoice: boolean;
 }
 
 export interface HistoryEntry {
@@ -38,6 +45,8 @@ export interface HistoryEntry {
   referenceAudioName: string;
   duration: number;
   createdAt: number;
+  /** 是否為真實語音克隆 */
+  isRealVoice?: boolean;
 }
 
 /** 支援的音檔格式 */
@@ -89,16 +98,11 @@ function getExtension(uriOrName: string): string {
 
 /**
  * 驗證音檔格式與時長
- *
- * @param uri 音檔 URI
- * @param fileName 檔名
- * @returns 驗證結果
  */
 export async function validateAudioFile(
   uri: string,
   fileName: string
 ): Promise<AudioValidationResult> {
-  // 1. 格式檢查
   const ext = getExtension(fileName || uri);
   if (!ext) {
     return {
@@ -117,7 +121,6 @@ export async function validateAudioFile(
     };
   }
 
-  // 2. 檔案大小檢查（避免空檔案）
   try {
     const fileInfo = await FileSystem.getInfoAsync(uri);
     if (!fileInfo.exists || (fileInfo.size !== undefined && fileInfo.size < 1000)) {
@@ -127,11 +130,9 @@ export async function validateAudioFile(
       };
     }
   } catch {
-    // 某些平台 getInfoAsync 可能無法取得大小，跳過此檢查
+    // 跳過大小檢查
   }
 
-  // 3. 時長檢查（透過 Audio API）
-  // 注意：在 web 平台上無法使用此方式，直接通過
   if (Platform.OS === "web") {
     return { valid: true };
   }
@@ -147,7 +148,6 @@ export async function validateAudioFile(
     }
     return { valid: true, duration };
   } catch {
-    // 無法取得時長時不阻擋，讓用戶自行決定
     return { valid: true };
   }
 }
@@ -156,7 +156,6 @@ export async function validateAudioFile(
  * 透過 expo-audio 取得音檔時長
  */
 async function getAudioDuration(uri: string): Promise<number> {
-  // 動態匯入避免 web 平台問題
   const { createAudioPlayer } = await import("expo-audio");
   return new Promise<number>((resolve, reject) => {
     try {
@@ -166,7 +165,6 @@ async function getAudioDuration(uri: string): Promise<number> {
         reject(new Error("timeout"));
       }, 5000);
 
-      // 等待 player 初始化後讀取 duration
       setTimeout(() => {
         clearTimeout(timeout);
         const duration = player.duration || 0;
@@ -184,13 +182,145 @@ async function getAudioDuration(uri: string): Promise<number> {
 }
 
 /**
+ * 將本地音檔 URI 讀取為 base64
+ */
+async function readAudioAsBase64(uri: string): Promise<string> {
+  // Web 平台使用 fetch
+  if (Platform.OS === "web") {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // 移除 data:xxx;base64, 前綴
+        resolve(result.split(",")[1] || result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // 原生平台使用 FileSystem
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return base64;
+}
+
+/**
+ * 呼叫後端 tRPC API 生成語音
+ */
+async function callVoiceGenerateAPI(
+  text: string,
+  profileId: string,
+): Promise<{ audioBase64: string; duration: number | null } | null> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        json: { text, profileId },
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      result?: { data?: { json?: { success?: boolean; audioBase64?: string; duration?: number } } }
+    };
+    const result = data?.result?.data?.json;
+
+    if (result?.success && result.audioBase64) {
+      return {
+        audioBase64: result.audioBase64,
+        duration: result.duration ?? null,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 呼叫後端 tRPC API 上傳音檔並建立 Voicebox Profile
+ */
+async function callUploadProfileAPI(
+  name: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.uploadProfile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        json: { name, audioBase64, mimeType },
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      result?: { data?: { json?: { success?: boolean; profileId?: string } } }
+    };
+    const result = data?.result?.data?.json;
+
+    if (result?.success && result.profileId) {
+      return result.profileId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 檢查 Voicebox 服務是否在線
+ */
+export async function checkVoiceboxStatus(): Promise<{
+  online: boolean;
+  profileCount?: number;
+  url?: string;
+}> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.health`, {
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) return { online: false };
+
+    const data = await response.json() as {
+      result?: { data?: { json?: { online?: boolean; profileCount?: number; url?: string } } }
+    };
+    const result = data?.result?.data?.json;
+
+    return {
+      online: result?.online ?? false,
+      profileCount: result?.profileCount,
+      url: result?.url,
+    };
+  } catch {
+    return { online: false };
+  }
+}
+
+/**
  * 生成語音
  *
- * 目前為模擬實作：生成一段靜音音檔作為佔位。
- * 未來替換為實際的本地 TTS 模型推理邏輯。
- *
- * @param params 參考音檔 URI 與目標文字
- * @returns 生成的音檔 URI 與元資料
+ * 流程：
+ * 1. 嘗試呼叫後端 Voicebox API（若已連線）
+ * 2. 若 Voicebox 未連線，回退至模擬音檔
  */
 export async function generateSpeech(
   params: VoiceGenerationParams
@@ -203,97 +333,127 @@ export async function generateSpeech(
 
   const { onProgress } = params;
 
-  // === 生成階段模擬 ===
-  // 階段 1：分析參考音檔聲音特徵
-  if (onProgress) onProgress(10, "分析聲音特徵...");
+  // 階段 1：讀取參考音檔
+  if (onProgress) onProgress(10, "讀取參考音檔...");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  // 嘗試使用 Voicebox 真實生成
+  let voiceProfileId = params.voiceProfileId;
+
+  // 若沒有 profile ID，先上傳音檔建立 profile
+  if (!voiceProfileId) {
+    if (onProgress) onProgress(20, "分析聲音特徵...");
+    try {
+      const ext = getExtension(params.referenceAudioUri);
+      const mimeType = ext === "mp3" ? "audio/mpeg"
+        : ext === "wav" ? "audio/wav"
+        : ext === "m4a" ? "audio/mp4"
+        : "audio/wav";
+
+      const audioBase64 = await readAudioAsBase64(params.referenceAudioUri);
+      const profileName = `echo_${timestamp}`;
+      voiceProfileId = await callUploadProfileAPI(profileName, audioBase64, mimeType) ?? undefined;
+    } catch {
+      // 上傳失敗，繼續使用模擬
+    }
+  }
+
+  if (voiceProfileId) {
+    // === Voicebox 真實語音克隆 ===
+    if (onProgress) onProgress(35, "提取音色與語調...");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    if (onProgress) onProgress(50, "AI 語音克隆生成中...");
+
+    const result = await callVoiceGenerateAPI(params.text, voiceProfileId);
+
+    if (result) {
+      if (onProgress) onProgress(85, "後處理音質優化...");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      if (onProgress) onProgress(95, "儲存音檔...");
+
+      // 儲存 base64 音檔到本地
+      await FileSystem.writeAsStringAsync(outputPath, result.audioBase64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (onProgress) onProgress(100, "完成");
+
+      const estimatedDuration = result.duration ?? Math.max(2, Math.ceil(params.text.length * 0.15));
+
+      return {
+        audioUri: outputPath,
+        duration: estimatedDuration,
+        createdAt: timestamp,
+        isRealVoice: true,
+      };
+    }
+  }
+
+  // === 回退：模擬音檔（Voicebox 未連線時） ===
+  if (onProgress) onProgress(40, "提取音色特徵...");
+  await new Promise((resolve) => setTimeout(resolve, 700));
+
+  if (onProgress) onProgress(60, "生成語音波形...");
   await new Promise((resolve) => setTimeout(resolve, 800));
 
-  // 階段 2：提取音色與語調
-  if (onProgress) onProgress(30, "提取音色與語調...");
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  if (onProgress) onProgress(80, "優化音質...");
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
-  // 階段 3：生成語音波形
-  if (onProgress) onProgress(50, "生成語音波形...");
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // 階段 4：後處理與降噪
-  if (onProgress) onProgress(75, "優化音質...");
-  await new Promise((resolve) => setTimeout(resolve, 600));
-
-  // 階段 5：儲存音檔
   if (onProgress) onProgress(90, "儲存音檔...");
 
-  // 建立包含音調的 WAV 檔案
-  // 使用正弦波生成柔和的音調，模擬語音的基本頻率
+  // 生成模擬音檔（正弦波）
   const sampleRate = 22050;
   const estimatedDuration = Math.max(2, Math.ceil(params.text.length * 0.15));
   const numSamples = sampleRate * estimatedDuration;
-  const dataSize = numSamples * 2; // 16-bit = 2 bytes per sample
+  const dataSize = numSamples * 2;
 
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
 
-  // RIFF header
-  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(0, 0x52494646, false);
   view.setUint32(4, 36 + dataSize, true);
-  view.setUint32(8, 0x57415645, false); // "WAVE"
-
-  // fmt chunk
-  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(8, 0x57415645, false);
+  view.setUint32(12, 0x666d7420, false);
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * 2, true);
   view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
-
-  // data chunk
-  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(36, 0x64617461, false);
   view.setUint32(40, dataSize, true);
 
-  // 生成柔和的語音模擬音調
-  // 使用多個正弦波疊加，模擬人聲的基頻和諧波
-  const baseFreq = 180; // 類似人聲基頻
+  const baseFreq = 180;
   const harmonics = [1, 2, 3];
   const harmonicWeights = [0.5, 0.2, 0.1];
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
     const progress = i / numSamples;
-
-    // 淡入淡出包絡
     let envelope = 1.0;
-    const fadeDuration = 0.1; // 100ms 淡入淡出
+    const fadeDuration = 0.1;
     if (progress < fadeDuration) {
       envelope = progress / fadeDuration;
     } else if (progress > 1 - fadeDuration) {
       envelope = (1 - progress) / fadeDuration;
     }
-
-    // 模擬語音的間歇性（每約 0.3 秒一個音節）
-    const syllableRate = 3.5; // 每秒音節數
+    const syllableRate = 3.5;
     const syllablePhase = (t * syllableRate) % 1;
     const syllableEnvelope = syllablePhase < 0.7 ? 1.0 : 0.3;
-
-    // 疊加正弦波生成音調
     let sample = 0;
     for (let h = 0; h < harmonics.length; h++) {
       const freq = baseFreq * harmonics[h];
-      // 加入些微頻率變化模擬語調起伏
       const freqMod = freq * (1 + 0.05 * Math.sin(t * 2));
       sample += harmonicWeights[h] * Math.sin(2 * Math.PI * freqMod * t);
     }
-
-    // 應用包絡
     sample *= envelope * syllableEnvelope * 0.6;
-
-    // 轉為 16-bit PCM
     const intSample = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
     view.setInt16(44 + i * 2, intSample, true);
   }
 
-  // 轉換為 base64
   const bytes = new Uint8Array(buffer);
   let binary = "";
   const chunkSize = 8192;
@@ -313,6 +473,7 @@ export async function generateSpeech(
     audioUri: outputPath,
     duration: estimatedDuration,
     createdAt: timestamp,
+    isRealVoice: false,
   };
 }
 

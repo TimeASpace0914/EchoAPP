@@ -34,7 +34,9 @@ export default function ResultScreen() {
     duration: string;
     createdAt: string;
     entryId?: string;
+    isRealVoice?: string;
   }>();
+  const isRealVoice = params.isRealVoice === "1";
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [title, setTitle] = useState("");
@@ -191,6 +193,14 @@ export default function ResultScreen() {
         renderItem={() => null}
         ListHeaderComponent={
           <View style={styles.content}>
+            {/* 語音來源標示 */}
+            <View style={[styles.sourceBadge, { backgroundColor: isRealVoice ? `${colors.success}15` : `${colors.warning}15` }]}>
+              <View style={[styles.sourceDot, { backgroundColor: isRealVoice ? colors.success : colors.warning }]} />
+              <Text style={[styles.sourceText, { color: isRealVoice ? colors.success : colors.warning }]}>
+                {isRealVoice ? "Voicebox AI 語音克隆" : "模擬語音（Voicebox 未連線）"}
+              </Text>
+            </View>
+
             {/* 音波視覺化卡片 */}
             <View style={[styles.waveCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
               <Waveform active={isPlaying} color={colors.primary} height={100} />
@@ -440,6 +450,23 @@ const styles = StyleSheet.create({
   content: {
     alignItems: "center",
     gap: 24,
+  },
+  sourceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  sourceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  sourceText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
   waveCard: {
     width: "100%",

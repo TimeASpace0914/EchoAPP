@@ -13,17 +13,28 @@ import { ScreenContainer } from "@/components/screen-container";
 import { Logo } from "@/components/logo";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useThemeContext } from "@/lib/theme-provider";
 
 type PageType = "menu" | "about" | "privacy" | "usage";
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const { colorScheme, setColorScheme } = useThemeContext();
   const [currentPage, setCurrentPage] = useState<PageType>("menu");
+  const isDark = colorScheme === "dark";
 
   const navigateTo = (page: PageType) => {
     setCurrentPage(page);
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const toggleTheme = () => {
+    const newScheme = isDark ? "light" : "dark";
+    setColorScheme(newScheme);
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
   };
 
@@ -213,6 +224,29 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* 深色模式切換 */}
+      <View style={styles.themeToggleSection}>
+        <TouchableOpacity
+          onPress={toggleTheme}
+          style={[styles.themeToggleCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: `${colors.primary}15` }]}>
+            <IconSymbol name={isDark ? "moon.fill" : "sun.max.fill"} size={22} color={colors.primary} />
+          </View>
+          <View style={styles.menuContent}>
+            <Text style={[styles.menuLabel, { color: colors.foreground }]}>
+              {isDark ? "深色模式" : "淺色模式"}
+            </Text>
+            <Text style={[styles.menuSubtitle, { color: colors.muted }]}>
+              點擊切換至{isDark ? "淺色" : "深色"}模式
+            </Text>
+          </View>
+          <View style={[styles.toggleSwitch, { backgroundColor: isDark ? colors.primary : colors.border }]}>
+            <View style={[styles.toggleKnob, { alignSelf: isDark ? "flex-end" : "flex-start" }]} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {/* 選單 */}
       <View style={styles.menuSection}>
         {menuItems.map((item, index) => (
@@ -360,6 +394,36 @@ const styles = StyleSheet.create({
   },
   menuSubtitle: {
     fontSize: 13,
+  },
+  themeToggleSection: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  themeToggleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    gap: 14,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  toggleSwitch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    paddingVertical: 3,
+    paddingHorizontal: 3,
+    justifyContent: "center",
+  },
+  toggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
   },
   footer: {
     alignItems: "center",

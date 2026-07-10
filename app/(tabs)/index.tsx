@@ -24,6 +24,7 @@ import {
   generateSpeech,
   saveHistoryEntry,
   validateAudioFile,
+  checkVoiceboxStatus,
   ALL_SUPPORTED_EXTENSIONS,
   SUPPORTED_AUDIO_EXTENSIONS,
   SUPPORTED_VIDEO_EXTENSIONS,
@@ -43,6 +44,14 @@ export default function HomeScreen() {
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [genStage, setGenStage] = useState("");
+  const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
+
+  // 檢查 Voicebox 連線狀態
+  useEffect(() => {
+    checkVoiceboxStatus().then((status) => {
+      setVoiceboxOnline(status.online);
+    }).catch(() => setVoiceboxOnline(false));
+  }, []);
 
   const previewPlayer = useAudioPlayer(audioUri ? { uri: audioUri } : null);
 
@@ -160,6 +169,7 @@ export default function HomeScreen() {
         referenceAudioName: audioName,
         duration: result.duration,
         createdAt: result.createdAt,
+        isRealVoice: result.isRealVoice,
       };
       await saveHistoryEntry(entry);
 
@@ -175,6 +185,7 @@ export default function HomeScreen() {
           duration: result.duration.toString(),
           createdAt: result.createdAt.toString(),
           entryId: entry.id,
+          isRealVoice: result.isRealVoice ? "1" : "0",
         },
       });
     } catch {
@@ -192,10 +203,17 @@ export default function HomeScreen() {
   return (
     <ScreenContainer className="flex-1">
       {/* 導覽列 */}
-      <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={{ width: 40 }} />
+        <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Logo height={36} />
-        <View style={{ width: 40 }} />
+        <View style={{ flex: 1 }} />
+        {/* Voicebox 連線狀態指示 */}
+        {voiceboxOnline !== null && (
+          <View style={[styles.statusDot, { backgroundColor: voiceboxOnline ? "#4CAF50" : "#FF9800" }]}>
+            <Text style={styles.statusDotText}>
+              {voiceboxOnline ? "AI 已連線" : "模擬模式"}
+            </Text>
+          </View>
+        )}
       </View>
 
       <ScrollView
@@ -345,7 +363,7 @@ export default function HomeScreen() {
             ]}
             value={text}
             onChangeText={(val) => setText(val.slice(0, MAX_TEXT_LENGTH))}
-            placeholder="例如：孩子，你要好好的，我會一直在你身邊..."
+            placeholder="例如：最近在幹嘛呀？有沒有好好吃飯！"
             placeholderTextColor="#BBBBBB"
             multiline
             maxLength={MAX_TEXT_LENGTH}
@@ -642,6 +660,18 @@ const styles = StyleSheet.create({
   },
   genProgressText: {
     fontSize: 13,
+    fontWeight: "600",
+  },
+  statusDot: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDotText: {
+    color: "#FFFFFF",
+    fontSize: 11,
     fontWeight: "600",
   },
 });
