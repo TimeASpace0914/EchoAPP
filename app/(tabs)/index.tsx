@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
+  Modal,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
@@ -21,6 +22,10 @@ import { useColors } from "@/hooks/use-colors";
 import {
   generateSpeech,
   saveHistoryEntry,
+  validateAudioFile,
+  ALL_SUPPORTED_EXTENSIONS,
+  SUPPORTED_AUDIO_EXTENSIONS,
+  SUPPORTED_VIDEO_EXTENSIONS,
   type HistoryEntry,
 } from "@/lib/voice-service";
 
@@ -32,18 +37,59 @@ export default function HomeScreen() {
   const [audioName, setAudioName] = useState<string>("");
   const [text, setText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
   const pickAudio = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["audio/*", "audio/wav", "audio/mpeg", "audio/mp3", "audio/m4a", "audio/aac"],
+        type: [
+          "audio/*",
+          "video/*",
+          "audio/wav",
+          "audio/mpeg",
+          "audio/mp3",
+          "audio/m4a",
+          "audio/aac",
+          "audio/flac",
+          "audio/ogg",
+          "video/mp4",
+          "video/quicktime",
+        ],
         copyToCacheDirectory: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        setValidationWarning(null);
+        setIsValidating(true);
+
+        // 驗證音檔
+        const validation = await validateAudioFile(asset.uri, asset.name || "");
+
+        setIsValidating(false);
+
+        if (!validation.valid) {
+          // 溫馨提示
+          Alert.alert(
+            "音檔提醒",
+            validation.error || "此音檔不符合要求，請重新選擇。",
+            [
+              { text: "重新選擇", onPress: () => pickAudio() },
+              { text: "仍要使用", onPress: () => {
+                  setAudioUri(asset.uri);
+                  setAudioName(asset.name || "未命名音檔");
+                  setValidationWarning(validation.error || null);
+                }
+              },
+            ]
+          );
+          return;
+        }
+
         setAudioUri(asset.uri);
         setAudioName(asset.name || "未命名音檔");
+
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
@@ -91,6 +137,7 @@ export default function HomeScreen() {
           text: text.trim(),
           duration: result.duration.toString(),
           createdAt: result.createdAt.toString(),
+          entryId: entry.id,
         },
       });
     } catch (err) {
@@ -100,18 +147,16 @@ export default function HomeScreen() {
     }
   }, [audioUri, text, audioName]);
 
+  const formatHint = `支援 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")}`;
+  const videoHint = `亦可從 ${SUPPORTED_VIDEO_EXTENSIONS.join("、")} 影片中提取音軌`;
+
   return (
     <ScreenContainer className="flex-1">
       {/* 導覽列 */}
       <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={{ width: 40 }} />
         <Logo height={36} />
-        <TouchableOpacity
-          onPress={() => router.push("/settings" as any)}
-          style={{ width: 40, alignItems: "center" }}
-        >
-          <IconSymbol name="gear" size={24} color={colors.muted} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -140,6 +185,14 @@ export default function HomeScreen() {
               <Text style={[styles.audioFileHint, { color: colors.muted }]}>
                 音檔已就緒
               </Text>
+              {validationWarning && (
+                <View style={[styles.warningBox, { backgroundColor: `${colors.warning}15` }]}>
+                  <IconSymbol name="exclamationmark.triangle" size={14} color={colors.warning} />
+                  <Text style={[styles.warningText, { color: colors.warning }]}>
+                    {validationWarning}
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity
                 onPress={pickAudio}
                 style={[
@@ -158,19 +211,45 @@ export default function HomeScreen() {
                 <IconSymbol name="cloud.fill" size={48} color={colors.primary} />
               </View>
               <Text style={[styles.uploadTitle, { color: colors.foreground }]}>
-                上傳音檔
+                上傳親友音檔
               </Text>
               <Text style={[styles.uploadSubtitle, { color: colors.muted }]}>
-                上傳親友生前的聲音，讓 AI 學習他的聲音
+                上傳親友生前的聲音，讓 AI 學習他的聲音特徵
               </Text>
+
+              {/* 格式提示 */}
+              <View style={[styles.formatHintBox, { backgroundColor: `${colors.muted}10`, borderColor: colors.border }]}>
+                <View style={styles.formatHintRow}>
+                  <IconSymbol name="info.circle" size={14} color={colors.muted} />
+                  <Text style={[styles.formatHintText, { color: colors.muted }]}>
+                    {formatHint}
+                  </Text>
+                </View>
+                <Text style={[styles.formatHintSub, { color: colors.muted }]}>
+                  {videoHint}
+                </Text>
+                <Text style={[styles.formatHintSub, { color: colors.muted }]}>
+                  建議音檔長度至少 3 秒以上
+                </Text>
+              </View>
+
               <TouchableOpacity
                 onPress={pickAudio}
+                disabled={isValidating}
                 style={[
                   styles.selectButton,
                   { backgroundColor: colors.primary },
+                  isValidating && { opacity: 0.6 },
                 ]}
               >
-                <Text style={styles.selectButtonText}>選擇音檔</Text>
+                {isValidating ? (
+                  <View style={styles.generatingContent}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.selectButtonText}>驗證中...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.selectButtonText}>選擇音檔</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -289,6 +368,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+  formatHintBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 4,
+    width: "100%",
+  },
+  formatHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  formatHintText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  formatHintSub: {
+    fontSize: 11,
+    textAlign: "center",
+  },
   selectButton: {
     paddingHorizontal: 32,
     paddingVertical: 12,
@@ -318,6 +418,19 @@ const styles = StyleSheet.create({
   },
   audioFileHint: {
     fontSize: 13,
+  },
+  warningBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    maxWidth: 280,
+  },
+  warningText: {
+    fontSize: 11,
+    flexShrink: 1,
   },
   changeButton: {
     paddingHorizontal: 20,

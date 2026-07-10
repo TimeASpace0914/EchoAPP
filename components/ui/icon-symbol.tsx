@@ -34,6 +34,11 @@ const MAPPING = {
   "heart.fill": "favorite",
   "trash": "delete",
   "info.circle": "info",
+  "checkmark.circle": "check-circle",
+  "exclamationmark.triangle": "warning",
+  "tag": "label",
+  "pencil": "edit",
+  "folder": "folder",
 } as unknown as IconMapping;
 
 /**
