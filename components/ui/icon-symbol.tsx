@@ -20,6 +20,7 @@ const MAPPING = {
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
   "xmark": "close",
+  "xmark.fill": "close",
   "arrow.clockwise": "refresh",
   "arrow.left": "arrow-back",
   "square.and.arrow.up": "share",
@@ -39,6 +40,7 @@ const MAPPING = {
   "tag": "label",
   "pencil": "edit",
   "folder": "folder",
+  "magnifyingglass": "search",
 } as unknown as IconMapping;
 
 /**

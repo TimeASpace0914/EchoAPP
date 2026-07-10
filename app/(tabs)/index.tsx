@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ScrollView,
   Text,
@@ -14,6 +14,7 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { Logo } from "@/components/logo";
@@ -39,6 +40,34 @@ export default function HomeScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [genProgress, setGenProgress] = useState(0);
+  const [genStage, setGenStage] = useState("");
+
+  const previewPlayer = useAudioPlayer(audioUri ? { uri: audioUri } : null);
+
+  useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true });
+  }, []);
+
+  const togglePreview = useCallback(() => {
+    try {
+      if (isPreviewPlaying) {
+        previewPlayer.pause();
+        setIsPreviewPlaying(false);
+      } else {
+        previewPlayer.play();
+        setIsPreviewPlaying(true);
+        if (Platform.OS !== "web") {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        // 預覽播放通常較短，5秒後自動停止狀態
+        setTimeout(() => setIsPreviewPlaying(false), 10000);
+      }
+    } catch {
+      Alert.alert("播放錯誤", "無法播放此音檔，請確認檔案格式正確");
+    }
+  }, [isPreviewPlaying, previewPlayer]);
 
   const pickAudio = useCallback(async () => {
     try {
@@ -63,24 +92,25 @@ export default function HomeScreen() {
         const asset = result.assets[0];
         setValidationWarning(null);
         setIsValidating(true);
+        setIsPreviewPlaying(false);
 
-        // 驗證音檔
         const validation = await validateAudioFile(asset.uri, asset.name || "");
 
         setIsValidating(false);
 
         if (!validation.valid) {
-          // 溫馨提示
           Alert.alert(
             "音檔提醒",
             validation.error || "此音檔不符合要求，請重新選擇。",
             [
               { text: "重新選擇", onPress: () => pickAudio() },
-              { text: "仍要使用", onPress: () => {
+              {
+                text: "仍要使用",
+                onPress: () => {
                   setAudioUri(asset.uri);
                   setAudioName(asset.name || "未命名音檔");
                   setValidationWarning(validation.error || null);
-                }
+                },
               },
             ]
           );
@@ -94,7 +124,7 @@ export default function HomeScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }
-    } catch (err) {
+    } catch {
       Alert.alert("錯誤", "無法選擇音檔，請重試");
     }
   }, []);
@@ -110,10 +140,17 @@ export default function HomeScreen() {
     }
 
     setIsGenerating(true);
+    setGenProgress(0);
+    setGenStage("準備中...");
+
     try {
       const result = await generateSpeech({
         referenceAudioUri: audioUri,
         text: text.trim(),
+        onProgress: (progress, stage) => {
+          setGenProgress(progress);
+          setGenStage(stage);
+        },
       });
 
       const entry: HistoryEntry = {
@@ -140,10 +177,12 @@ export default function HomeScreen() {
           entryId: entry.id,
         },
       });
-    } catch (err) {
+    } catch {
       Alert.alert("生成失敗", "語音生成過程中發生錯誤，請重試");
     } finally {
       setIsGenerating(false);
+      setGenProgress(0);
+      setGenStage("");
     }
   }, [audioUri, text, audioName]);
 
@@ -185,6 +224,7 @@ export default function HomeScreen() {
               <Text style={[styles.audioFileHint, { color: colors.muted }]}>
                 音檔已就緒
               </Text>
+
               {validationWarning && (
                 <View style={[styles.warningBox, { backgroundColor: `${colors.warning}15` }]}>
                   <IconSymbol name="exclamationmark.triangle" size={14} color={colors.warning} />
@@ -193,6 +233,29 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               )}
+
+              {/* 預覽播放區 */}
+              <View style={[styles.previewBox, { backgroundColor: "#F5F5F5", borderColor: colors.border }]}>
+                <TouchableOpacity
+                  onPress={togglePreview}
+                  style={[styles.previewPlayButton, { backgroundColor: colors.primary }]}
+                >
+                  <IconSymbol
+                    name={isPreviewPlaying ? "pause.fill" : "play.fill"}
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+                <View style={styles.previewInfo}>
+                  <Text style={[styles.previewLabel, { color: colors.foreground }]}>
+                    {isPreviewPlaying ? "試聽中..." : "試聽音檔"}
+                  </Text>
+                  <Text style={[styles.previewHint, { color: colors.muted }]}>
+                    確認音檔內容無誤後再生成
+                  </Text>
+                </View>
+              </View>
+
               <TouchableOpacity
                 onPress={pickAudio}
                 style={[
@@ -294,28 +357,47 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* 生成按鈕 */}
-        <TouchableOpacity
-          onPress={handleGenerate}
-          disabled={isGenerating}
-          style={[
-            styles.generateButton,
-            {
-              backgroundColor: colors.primary,
-              opacity: isGenerating ? 0.7 : 1,
-              shadowColor: colors.primary,
-            },
-          ]}
-        >
-          {isGenerating ? (
-            <View style={styles.generatingContent}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.generateButtonText}>生成中...</Text>
+        {/* 生成按鈕 / 生成進度 */}
+        {isGenerating ? (
+          <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+            <View style={styles.generatingHeader}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <View style={styles.generatingInfo}>
+                <Text style={[styles.generatingTitle, { color: colors.foreground }]}>
+                  正在生成語音
+                </Text>
+                <Text style={[styles.generatingStage, { color: colors.muted }]}>
+                  {genStage}
+                </Text>
+              </View>
             </View>
-          ) : (
+            {/* 進度條 */}
+            <View style={[styles.genProgressBar, { backgroundColor: colors.border }]}>
+              <View
+                style={[
+                  styles.genProgressFill,
+                  { backgroundColor: colors.primary, width: `${genProgress}%` },
+                ]}
+              />
+            </View>
+            <Text style={[styles.genProgressText, { color: colors.muted }]}>
+              {genProgress}%
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={handleGenerate}
+            style={[
+              styles.generateButton,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+              },
+            ]}
+          >
             <Text style={styles.generateButtonText}>生成語音</Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </ScreenContainer>
   );
@@ -403,6 +485,7 @@ const styles = StyleSheet.create({
   uploadedContent: {
     alignItems: "center",
     gap: 8,
+    width: "100%",
   },
   audioFileIcon: {
     width: 56,
@@ -431,6 +514,35 @@ const styles = StyleSheet.create({
   warningText: {
     fontSize: 11,
     flexShrink: 1,
+  },
+  previewBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    width: "100%",
+    marginTop: 4,
+  },
+  previewPlayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  previewLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  previewHint: {
+    fontSize: 12,
   },
   changeButton: {
     paddingHorizontal: 20,
@@ -492,5 +604,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  generatingCard: {
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    gap: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  generatingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  generatingInfo: {
+    gap: 4,
+  },
+  generatingTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  generatingStage: {
+    fontSize: 13,
+  },
+  genProgressBar: {
+    width: "100%",
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  genProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  genProgressText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  TextInput,
+  Modal,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, router } from "expo-router";
@@ -17,6 +19,7 @@ import { useColors } from "@/hooks/use-colors";
 import {
   getHistory,
   deleteHistoryEntry,
+  updateHistoryEntry,
   formatTimestamp,
   formatDuration,
   type HistoryEntry,
@@ -27,6 +30,13 @@ export default function HistoryScreen() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 編輯 Modal 狀態
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTags, setEditTags] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -41,7 +51,6 @@ export default function HistoryScreen() {
     setLoading(false);
   };
 
-  // 收集所有標籤
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
     entries.forEach((e) => {
@@ -50,11 +59,24 @@ export default function HistoryScreen() {
     return Array.from(tagSet);
   }, [entries]);
 
-  // 依篩選標籤過濾
+  // 依搜尋關鍵字與標籤過濾
   const filteredEntries = useMemo(() => {
-    if (!activeFilter) return entries;
-    return entries.filter((e) => e.tags?.includes(activeFilter));
-  }, [entries, activeFilter]);
+    let result = entries;
+    if (activeFilter) {
+      result = result.filter((e) => e.tags?.includes(activeFilter));
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e.title?.toLowerCase().includes(q) ?? false) ||
+          (e.tags?.some((t) => t.toLowerCase().includes(q)) ?? false) ||
+          e.text.toLowerCase().includes(q) ||
+          e.referenceAudioName.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [entries, activeFilter, searchQuery]);
 
   const handlePlay = (entry: HistoryEntry) => {
     if (Platform.OS !== "web") {
@@ -91,6 +113,34 @@ export default function HistoryScreen() {
         },
       ]
     );
+  };
+
+  const openEditModal = (entry: HistoryEntry) => {
+    setEditingEntry(entry);
+    setEditTitle(entry.title || "");
+    setEditTags(entry.tags?.join("、") || "");
+    setEditModalVisible(true);
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEntry) return;
+    const tags = editTags
+      .split(/[、,，\s]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    await updateHistoryEntry(editingEntry.id, {
+      title: editTitle.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+    });
+    setEditModalVisible(false);
+    loadHistory();
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const renderTag = ({ item }: { item: string }) => (
@@ -138,11 +188,17 @@ export default function HistoryScreen() {
               {item.referenceAudioName}
             </Text>
           </View>
+          {/* 編輯按鈕 */}
+          <TouchableOpacity
+            onPress={() => openEditModal(item)}
+            style={styles.entryEditButton}
+          >
+            <IconSymbol name="pencil" size={16} color={colors.muted} />
+          </TouchableOpacity>
         </View>
         <Text style={[styles.entryText, { color: colors.foreground }]} numberOfLines={2}>
           {item.text}
         </Text>
-        {/* 標籤顯示 */}
         {item.tags && item.tags.length > 0 && (
           <View style={styles.entryTagsRow}>
             {item.tags.map((tag) => (
@@ -184,14 +240,17 @@ export default function HistoryScreen() {
         <IconSymbol name="clock.fill" size={48} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-        {activeFilter ? "沒有符合此標籤的紀錄" : "尚無回憶紀錄"}
+        {searchQuery || activeFilter ? "沒有符合的紀錄" : "尚無回憶紀錄"}
       </Text>
       <Text style={[styles.emptyHint, { color: colors.muted }]}>
-        {activeFilter ? "試試其他標籤或清除篩選" : "在首頁生成語音後，紀錄將顯示在這裡"}
+        {searchQuery || activeFilter ? "試試其他關鍵字或清除篩選" : "在首頁生成語音後，紀錄將顯示在這裡"}
       </Text>
-      {activeFilter && (
+      {(searchQuery || activeFilter) && (
         <TouchableOpacity
-          onPress={() => setActiveFilter(null)}
+          onPress={() => {
+            setSearchQuery("");
+            setActiveFilter(null);
+          }}
           style={[styles.clearFilterButton, { borderColor: colors.border }]}
         >
           <Text style={[styles.clearFilterText, { color: colors.muted }]}>清除篩選</Text>
@@ -208,6 +267,26 @@ export default function HistoryScreen() {
         <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
           {entries.length > 0 ? `共 ${entries.length} 筆紀錄` : ""}
         </Text>
+      </View>
+
+      {/* 搜尋列 */}
+      <View style={[styles.searchBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="搜尋名稱、標籤或內容..."
+            placeholderTextColor="#BBBBBB"
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <IconSymbol name="xmark" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* 標籤篩選列 */}
@@ -233,6 +312,57 @@ export default function HistoryScreen() {
         onRefresh={loadHistory}
         refreshing={loading}
       />
+
+      {/* 編輯 Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.editModal, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.editModalTitle, { color: colors.foreground }]}>
+              編輯回憶
+            </Text>
+
+            <Text style={[styles.editLabel, { color: colors.muted }]}>名稱</Text>
+            <TextInput
+              style={[styles.editInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="為這段語音取個名字..."
+              placeholderTextColor="#BBBBBB"
+              maxLength={30}
+            />
+
+            <Text style={[styles.editLabel, { color: colors.muted }]}>標籤（以頓號分隔）</Text>
+            <TextInput
+              style={[styles.editInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              value={editTags}
+              onChangeText={setEditTags}
+              placeholder="例如：生日、叮嚀、祝福"
+              placeholderTextColor="#BBBBBB"
+              maxLength={50}
+            />
+
+            <View style={styles.editModalActions}>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                style={[styles.editCancelButton, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.editCancelText, { color: colors.muted }]}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveEdit}
+                style={[styles.editSaveButton, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.editSaveText}>儲存</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -251,6 +381,25 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     marginTop: 4,
+  },
+  searchBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+  },
+  searchInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
   },
   filterBar: {
     borderBottomWidth: 0.5,
@@ -316,6 +465,12 @@ const styles = StyleSheet.create({
   },
   entryRefName: {
     fontSize: 13,
+  },
+  entryEditButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   entryText: {
     fontSize: 15,
@@ -392,5 +547,64 @@ const styles = StyleSheet.create({
   },
   clearFilterText: {
     fontSize: 14,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  editModal: {
+    width: "100%",
+    borderRadius: 24,
+    padding: 24,
+    gap: 8,
+  },
+  editModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  editInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  editModalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  editCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  editCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  editSaveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  editSaveText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

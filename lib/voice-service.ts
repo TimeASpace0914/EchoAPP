@@ -14,6 +14,8 @@ export interface VoiceGenerationParams {
   referenceAudioUri: string;
   /** 要生成的文字內容 */
   text: string;
+  /** 生成進度回調（0-100） */
+  onProgress?: (progress: number, stage: string) => void;
 }
 
 export interface VoiceGenerationResult {
@@ -199,18 +201,35 @@ export async function generateSpeech(
   const fileName = `echo_${timestamp}.wav`;
   const outputPath = `${AUDIO_DIR}${fileName}`;
 
-  // === 模擬生成 ===
-  // 模擬推理延遲
-  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const { onProgress } = params;
 
-  // 建立一個最小的 WAV 檔案作為佔位
-  // 未來這裡會替換為實際的模型推理輸出
-  const sampleRate = 16000;
+  // === 生成階段模擬 ===
+  // 階段 1：分析參考音檔聲音特徵
+  if (onProgress) onProgress(10, "分析聲音特徵...");
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  // 階段 2：提取音色與語調
+  if (onProgress) onProgress(30, "提取音色與語調...");
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  // 階段 3：生成語音波形
+  if (onProgress) onProgress(50, "生成語音波形...");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // 階段 4：後處理與降噪
+  if (onProgress) onProgress(75, "優化音質...");
+  await new Promise((resolve) => setTimeout(resolve, 600));
+
+  // 階段 5：儲存音檔
+  if (onProgress) onProgress(90, "儲存音檔...");
+
+  // 建立包含音調的 WAV 檔案
+  // 使用正弦波生成柔和的音調，模擬語音的基本頻率
+  const sampleRate = 22050;
   const estimatedDuration = Math.max(2, Math.ceil(params.text.length * 0.15));
   const numSamples = sampleRate * estimatedDuration;
   const dataSize = numSamples * 2; // 16-bit = 2 bytes per sample
 
-  // WAV 檔頭 (44 bytes) + 音訊資料
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
 
@@ -221,32 +240,74 @@ export async function generateSpeech(
 
   // fmt chunk
   view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true); // chunk size
-  view.setUint16(20, 1, true); // PCM format
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
   view.setUint16(22, 1, true); // mono
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); // byte rate
-  view.setUint16(32, 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
 
   // data chunk
   view.setUint32(36, 0x64617461, false); // "data"
   view.setUint32(40, dataSize, true);
 
-  // 填入靜音資料（全零）
-  // 已由 ArrayBuffer 初始化為零
+  // 生成柔和的語音模擬音調
+  // 使用多個正弦波疊加，模擬人聲的基頻和諧波
+  const baseFreq = 180; // 類似人聲基頻
+  const harmonics = [1, 2, 3];
+  const harmonicWeights = [0.5, 0.2, 0.1];
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const progress = i / numSamples;
+
+    // 淡入淡出包絡
+    let envelope = 1.0;
+    const fadeDuration = 0.1; // 100ms 淡入淡出
+    if (progress < fadeDuration) {
+      envelope = progress / fadeDuration;
+    } else if (progress > 1 - fadeDuration) {
+      envelope = (1 - progress) / fadeDuration;
+    }
+
+    // 模擬語音的間歇性（每約 0.3 秒一個音節）
+    const syllableRate = 3.5; // 每秒音節數
+    const syllablePhase = (t * syllableRate) % 1;
+    const syllableEnvelope = syllablePhase < 0.7 ? 1.0 : 0.3;
+
+    // 疊加正弦波生成音調
+    let sample = 0;
+    for (let h = 0; h < harmonics.length; h++) {
+      const freq = baseFreq * harmonics[h];
+      // 加入些微頻率變化模擬語調起伏
+      const freqMod = freq * (1 + 0.05 * Math.sin(t * 2));
+      sample += harmonicWeights[h] * Math.sin(2 * Math.PI * freqMod * t);
+    }
+
+    // 應用包絡
+    sample *= envelope * syllableEnvelope * 0.6;
+
+    // 轉為 16-bit PCM
+    const intSample = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
+    view.setInt16(44 + i * 2, intSample, true);
+  }
 
   // 轉換為 base64
   const bytes = new Uint8Array(buffer);
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
   }
   const base64 = btoa(binary);
 
   await FileSystem.writeAsStringAsync(outputPath, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
+
+  if (onProgress) onProgress(100, "完成");
 
   return {
     audioUri: outputPath,
