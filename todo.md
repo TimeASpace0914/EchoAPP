@@ -97,3 +97,12 @@
 - [x] 加入手動 multipart 構建替代 FormData/Blob（更可靠）
 - [x] 加入詳細日誌方便排查
 - [x] 端到端測試通過（upload → generate → 358KB 音檔, 5.6s）
+
+## 第十三輪需求（修復 Voicebox 音檔驗證失敗 HTTP 400）
+- [x] pickAudio 保存 asset.mimeType 並傳遞到上傳流程
+- [x] generateSpeech 使用真實 mimeType 而非從副檔名猜測
+- [x] voicebox.ts 根據 mimeType 正確設定副檔名和 Content-Type
+- [x] 移除影片支援（Voicebox 不接受影片，APP 端無法提取音軌）
+- [x] validateAudioFile 移除影片格式接受邏輯（只接受音檔）
+- [x] 端到端後端測試通過（WAV 上傳 → 生成 → 取得音檔成功）
+- [x] TypeScript 型別檢查通過（0 errors）

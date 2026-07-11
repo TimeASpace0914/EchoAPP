@@ -28,6 +28,10 @@ export interface VoiceGenerationParams {
   text: string;
   /** Voicebox 聲音檔案 ID（若已建立） */
   voiceProfileId?: string;
+  /** 音檔 MIME type（從 DocumentPicker 取得，避免猜測） */
+  audioMimeType?: string;
+  /** 原始檔名（從 DocumentPicker 取得） */
+  audioFileName?: string;
   /** 生成進度回調（0-100） */
   onProgress?: (progress: number, stage: string) => void;
 }
@@ -63,14 +67,11 @@ export const SUPPORTED_AUDIO_EXTENSIONS = [
   "mp3", "wav", "m4a", "aac", "flac", "ogg", "wma",
 ];
 
-/** 支援的影片格式（可從中提取音軌） */
-export const SUPPORTED_VIDEO_EXTENSIONS = [
-  "mp4", "mov", "avi", "mkv", "webm",
-];
+/** 支援的影片格式（保留匯出以避免破壞其他模組） */
+export const SUPPORTED_VIDEO_EXTENSIONS: string[] = [];
 
 export const ALL_SUPPORTED_EXTENSIONS = [
   ...SUPPORTED_AUDIO_EXTENSIONS,
-  ...SUPPORTED_VIDEO_EXTENSIONS,
 ];
 
 /** 最低音檔時長（秒） */
@@ -121,12 +122,11 @@ export async function validateAudioFile(
   }
 
   const isAudio = SUPPORTED_AUDIO_EXTENSIONS.includes(ext);
-  const isVideo = SUPPORTED_VIDEO_EXTENSIONS.includes(ext);
 
-  if (!isAudio && !isVideo) {
+  if (!isAudio) {
     return {
       valid: false,
-      error: `不支援此檔案格式（.${ext}）。請使用 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")} 或 ${SUPPORTED_VIDEO_EXTENSIONS.join("、")} 格式。`,
+      error: `不支援此檔案格式（.${ext}）。請使用 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")} 格式。`,
     };
   }
 
@@ -382,11 +382,16 @@ export async function generateSpeech(
   if (!voiceProfileId) {
     if (onProgress) onProgress(15, "正在分析聲音特徵...");
     try {
-      const ext = getExtension(params.referenceAudioUri);
-      const mimeType = ext === "mp3" ? "audio/mpeg"
-        : ext === "wav" ? "audio/wav"
-        : ext === "m4a" ? "audio/mp4"
-        : "audio/wav";
+      // 使用 picker 提供的真實 mimeType，否則從副檔名推導
+      const ext = getExtension(params.audioFileName || params.referenceAudioUri);
+      const mimeType = params.audioMimeType
+        || (ext === "mp3" ? "audio/mpeg"
+          : ext === "wav" ? "audio/wav"
+          : ext === "m4a" ? "audio/mp4"
+          : ext === "aac" ? "audio/aac"
+          : ext === "flac" ? "audio/flac"
+          : ext === "ogg" ? "audio/ogg"
+          : "audio/wav");
 
       const audioBase64 = await readAudioAsBase64(params.referenceAudioUri);
       if (onProgress) onProgress(25, "正在上傳聲音檔案至伺服器...");

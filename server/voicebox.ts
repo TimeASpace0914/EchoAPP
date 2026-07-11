@@ -121,18 +121,25 @@ export async function uploadVoiceProfile(
   try {
     const binaryData = Buffer.from(audioBase64, "base64");
     
-    // 正確映射 MIME type 到副檔名
+    // 正確映射 MIME type 到副檔名（涵蓋所有常見音檔格式）
     const extMap: Record<string, string> = {
       "audio/wav": "wav",
+      "audio/x-wav": "wav",
       "audio/mpeg": "mp3",
+      "audio/mp3": "mp3",
       "audio/mp4": "m4a",
+      "audio/x-m4a": "m4a",
       "audio/aac": "aac",
+      "audio/x-aac": "aac",
       "audio/flac": "flac",
       "audio/ogg": "ogg",
       "audio/x-wma": "wma",
+      "audio/webm": "webm",
     };
     const ext = extMap[mimeType] || "wav";
     const fileName = `reference.${ext}`;
+
+    console.log(`[Voicebox] Upload debug: mimeType=${mimeType}, ext=${ext}, fileName=${fileName}, audioSize=${binaryData.length}bytes`);
     
     // 手動構建 multipart/form-data
     const boundary = `----VoiceboxBoundary${Date.now()}${Math.random().toString(36).slice(2)}`;

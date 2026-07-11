@@ -29,7 +29,6 @@ import {
   checkVoiceboxStatus,
   ALL_SUPPORTED_EXTENSIONS,
   SUPPORTED_AUDIO_EXTENSIONS,
-  SUPPORTED_VIDEO_EXTENSIONS,
   type HistoryEntry,
 } from "@/lib/voice-service";
 
@@ -39,6 +38,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string>("");
+  const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -98,7 +98,6 @@ export default function HomeScreen() {
       const result = await DocumentPicker.getDocumentAsync({
         type: [
           "audio/*",
-          "video/*",
           "audio/wav",
           "audio/mpeg",
           "audio/mp3",
@@ -106,8 +105,6 @@ export default function HomeScreen() {
           "audio/aac",
           "audio/flac",
           "audio/ogg",
-          "video/mp4",
-          "video/quicktime",
         ],
         copyToCacheDirectory: true,
       });
@@ -130,11 +127,12 @@ export default function HomeScreen() {
               { text: "重新選擇", onPress: () => pickAudio() },
               {
                 text: "仍要使用",
-                onPress: () => {
-                  setAudioUri(asset.uri);
-                  setAudioName(asset.name || "未命名音檔");
-                  setValidationWarning(validation.error || null);
-                },
+                  onPress: () => {
+                    setAudioUri(asset.uri);
+                    setAudioName(asset.name || "未命名音檔");
+                    setAudioMimeType(asset.mimeType || null);
+                    setValidationWarning(validation.error || null);
+                  },
               },
             ]
           );
@@ -143,6 +141,7 @@ export default function HomeScreen() {
 
         setAudioUri(asset.uri);
         setAudioName(asset.name || "未命名音檔");
+        setAudioMimeType(asset.mimeType || null);
 
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -172,6 +171,8 @@ export default function HomeScreen() {
       const result = await generateSpeech({
         referenceAudioUri: audioUri,
         text: text.trim(),
+        audioMimeType: audioMimeType || undefined,
+        audioFileName: audioName || undefined,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -214,10 +215,9 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName]);
+  }, [audioUri, text, audioName, audioMimeType]);
 
-  const formatHint = `支援 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")}`;
-  const videoHint = `亦可從 ${SUPPORTED_VIDEO_EXTENSIONS.join("、")} 影片中提取音軌`;
+  const formatHint = `支援 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")} 格式`;
 
   return (
     <ScreenContainer className="flex-1">
@@ -329,9 +329,6 @@ export default function HomeScreen() {
                     {formatHint}
                   </Text>
                 </View>
-                <Text style={[styles.formatHintSub, { color: colors.muted }]}>
-                  {videoHint}
-                </Text>
                 <Text style={[styles.formatHintSub, { color: colors.muted }]}>
                   建議音檔長度至少 3 秒以上
                 </Text>
