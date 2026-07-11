@@ -10,6 +10,51 @@
  */
 
 import { ENV } from "./_core/env";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
+import path from "path";
+import os from "os";
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * 使用 ffmpeg 將任意音檔格式轉換為 WAV（16kHz, mono, 16-bit）
+ * Voicebox 對 WAV 格式的相容性最佳，M4A/MP4 等容器常被拒絕。
+ */
+async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buffer> {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `vb_in_${Date.now()}.${inputExt}`);
+  const outputPath = path.join(tmpDir, `vb_out_${Date.now()}.wav`);
+
+  try {
+    // 寫入輸入檔案
+    fs.writeFileSync(inputPath, inputBuffer);
+
+    // 使用 ffmpeg 轉換為標準 WAV 格式
+    await execFileAsync("ffmpeg", [
+      "-y",               // 覆寫輸出
+      "-i", inputPath,     // 輸入
+      "-ar", "16000",      // 採樣率 16kHz
+      "-ac", "1",           // 單聲道
+      "-sample_fmt", "s16", // 16-bit PCM
+      "-f", "wav",          // 輸出格式
+      outputPath,
+    ], { timeout: 30000 });
+
+    // 讀取轉換後的檔案
+    const wavBuffer = fs.readFileSync(outputPath);
+    console.log(`[Voicebox] ffmpeg converted: ${inputExt} → wav, ${inputBuffer.length}bytes → ${wavBuffer.length}bytes`);
+    return wavBuffer;
+  } catch (error) {
+    console.warn(`[Voicebox] ffmpeg conversion failed (${inputExt}), using original:`, error instanceof Error ? error.message : error);
+    return inputBuffer; // 轉換失敗時退回原始檔案
+  } finally {
+    // 清理暫存檔案
+    try { fs.unlinkSync(inputPath); } catch {}
+    try { fs.unlinkSync(outputPath); } catch {}
+  }
+}
 
 function getVoiceboxUrl(): string {
   const url = (ENV as any).voiceboxUrl || process.env.VOICEBOX_URL || "http://localhost:17493";
@@ -143,11 +188,11 @@ export async function uploadVoiceProfile(
     };
   }
 
-  // 步驟 2：上傳參考音檔（手動構建 multipart/form-data，更可靠）
+  // 步驟 2：上傳參考音檔（先轉換為 WAV，再構建 multipart/form-data）
   try {
-    const binaryData = Buffer.from(audioBase64, "base64");
+    let binaryData: Buffer = Buffer.from(audioBase64, "base64");
     
-    // 正確映射 MIME type 到副檔名（涵蓋所有常見音檔格式）
+    // 正確映射 MIME type 到副檔名
     const extMap: Record<string, string> = {
       "audio/wav": "wav",
       "audio/x-wav": "wav",
@@ -162,10 +207,24 @@ export async function uploadVoiceProfile(
       "audio/x-wma": "wma",
       "audio/webm": "webm",
     };
-    const ext = extMap[mimeType] || "wav";
-    const fileName = `reference.${ext}`;
-
-    console.log(`[Voicebox] Upload debug: mimeType=${mimeType}, ext=${ext}, fileName=${fileName}, audioSize=${binaryData.length}bytes`);
+    const originalExt = extMap[mimeType] || "wav";
+    
+    console.log(`[Voicebox] Upload debug: mimeType=${mimeType}, originalExt=${originalExt}, audioSize=${binaryData.length}bytes`);
+    
+    // 如果不是 WAV，先用 ffmpeg 轉換為標準 WAV 格式
+    let uploadMimeType = mimeType;
+    let uploadExt = originalExt;
+    if (originalExt !== "wav") {
+      console.log(`[Voicebox] Converting ${originalExt} → wav via ffmpeg...`);
+      const convertedBuffer = await convertToWav(binaryData, originalExt);
+      if (convertedBuffer.length !== binaryData.length || !convertedBuffer.equals(binaryData)) {
+        binaryData = convertedBuffer;
+        uploadMimeType = "audio/wav";
+        uploadExt = "wav";
+      }
+    }
+    
+    const fileName = `reference.${uploadExt}`;
     
     // 手動構建 multipart/form-data
     const boundary = `----VoiceboxBoundary${Date.now()}${Math.random().toString(36).slice(2)}`;
@@ -174,7 +233,7 @@ export async function uploadVoiceProfile(
     const fileHeader = Buffer.from(
       `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
-      `Content-Type: ${mimeType}\r\n\r\n`
+      `Content-Type: ${uploadMimeType}\r\n\r\n`
     );
     const fileFooter = Buffer.from("\r\n");
     
@@ -191,7 +250,7 @@ export async function uploadVoiceProfile(
     // 組合所有部分
     const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
     
-    console.log(`[Voicebox] Uploading sample: profile=${profileId}, file=${fileName}, size=${binaryData.length}bytes, mimeType=${mimeType}`);
+    console.log(`[Voicebox] Uploading sample: profile=${profileId}, file=${fileName}, size=${binaryData.length}bytes, mimeType=${uploadMimeType}`);
     
     const sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
       method: "POST",

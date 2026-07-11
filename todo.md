@@ -117,3 +117,11 @@
 - [x] 前端 abort 錯誤訊息改善（涵蓋 abort 而非只判斷 TimeoutError）
 - [x] 格式提示文字縮短為「支援 MP3、WAV、M4A、AAC 等常見音檔格式」
 - [x] 後端 health 端點測試通過（online: true, profileCount: 13）
+
+## 第十五輪需求（根本修復：ffmpeg 音檔轉換 + UI 溢出修復）
+- [x] 後端加入 ffmpeg 自動轉換邏輯（非 WAV 格式自動轉為 16kHz mono WAV）
+- [x] M4A 上傳測試通過（ffmpeg 轉換後 Voicebox 接受）
+- [x] MP3 上傳測試通過（ffmpeg 轉換後 Voicebox 接受）
+- [x] formatHintText 加入 flexShrink: 1 + flexWrap: "wrap" 防止文字溢出
+- [x] formatHintRow 加入 flexWrap: "wrap" 讓整行可換行
+- [x] TypeScript 型別檢查通過（0 errors）

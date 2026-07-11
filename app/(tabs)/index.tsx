@@ -539,10 +539,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flexWrap: "wrap",
   },
   formatHintText: {
     fontSize: 12,
     fontWeight: "500",
+    flexShrink: 1,
+    flexWrap: "wrap",
   },
   formatHintSub: {
     fontSize: 11,
