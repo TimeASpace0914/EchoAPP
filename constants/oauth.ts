@@ -45,6 +45,29 @@ export function getApiBaseUrl(): string {
     }
   }
 
+  // On native (iOS/Android), use Expo Constants to derive API URL
+  // The dev server URL is embedded in the app bundle's manifest
+  if (ReactNative.Platform.OS !== "web") {
+    try {
+      const Constants = require("expo-constants").default;
+      const manifestUrl = Constants.expoConfig?.extra?.expoGoProxyUrl ||
+                          Constants.manifest2?.extra?.expoGoProxyUrl ||
+                          Constants.manifest?.extra?.expoGoProxyUrl;
+      if (manifestUrl) {
+        // Replace port 8081 with 3000 in the manifest URL
+        return manifestUrl.replace(/:8081/, ":3000").replace(/^http:/, "https:");
+      }
+      // Fallback: try to get from the hostUri
+      const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.hostUri;
+      if (hostUri) {
+        const apiHost = hostUri.replace(/:8081/, ":3000");
+        return `http://${apiHost}`;
+      }
+    } catch {
+      // Constants not available
+    }
+  }
+
   // Fallback to empty (will use relative URL)
   return "";
 }

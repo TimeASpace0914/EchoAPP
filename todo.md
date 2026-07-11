@@ -61,3 +61,10 @@
 - [x] 後端加入 Voicebox REST 端點（health/upload/generate）
 - [x] 修復語音生成功能使其能實際產出音檔
 - [x] 放大啟動動畫 LOGO（80→120）
+
+## 第八輪需求（ngrok 整合 + 完整修復生成 + LOGO 再放大）
+- [x] 設定 ngrok URL 到後端環境變數
+- [x] 後端 Voicebox API 呼叫加入 ngrok-skip-browser-warning header
+- [x] 修復前端 native 平台 API base URL（native 無法使用相對路徑）
+- [x] 放大啟動動畫 LOGO（120→160）
+- [x] 移除模擬音檔 fallback，生成失敗時報錯而非靜默產出假音檔

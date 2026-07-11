@@ -64,8 +64,7 @@ async function startServer() {
     res.json({ ok: true, timestamp: Date.now() });
   });
 
-  // ─── Voicebox REST 端點（供 APP 直接呼叫） ──────────────────────────────
-  // Voicebox 伺服器位址由後端環境變數控制，不暴露給前端
+  // ─── Voicebox REST 端點（供 APP 呼叫） ──────────────────────────────
   app.get("/api/voicebox/health", async (_req, res) => {
     try {
       const status = await checkVoiceboxHealth();
@@ -117,7 +116,6 @@ async function startServer() {
         res.status(502).json({ success: false, error: result.error, details: result.details });
         return;
       }
-      // 同時上傳到 S3 儲存
       let storageUrl: string | null = null;
       try {
         const audioBuffer = Buffer.from(result.audio, "base64");

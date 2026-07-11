@@ -56,6 +56,9 @@ export async function getVoiceboxProfiles(): Promise<VoiceboxProfile[] | Voicebo
     const baseUrl = getVoiceboxUrl();
     const response = await fetch(`${baseUrl}/profiles`, {
       signal: AbortSignal.timeout(5000),
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
     });
 
     if (!response.ok) {
@@ -99,6 +102,7 @@ export async function generateVoiceboxSpeech(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({
         text: request.text,
@@ -176,6 +180,9 @@ export async function uploadVoiceProfile(
       method: "POST",
       body: formData,
       signal: AbortSignal.timeout(30000),
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
     });
 
     if (!response.ok) {
@@ -211,6 +218,9 @@ export async function checkVoiceboxHealth(): Promise<{
   try {
     const response = await fetch(`${url}/profiles`, {
       signal: AbortSignal.timeout(3000),
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
     });
 
     if (response.ok) {

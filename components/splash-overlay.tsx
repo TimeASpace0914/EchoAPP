@@ -90,7 +90,7 @@ export function SplashOverlay({
     <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
       <View style={styles.content}>
         <Animated.View style={logoAnimatedStyle}>
-          <Logo height={120} variant="black" />
+          <Logo height={160} variant="black" />
         </Animated.View>
         <Animated.View
           style={[styles.progressTrack, progressAnimatedStyle]}

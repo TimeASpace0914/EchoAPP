@@ -1,13 +1,9 @@
 /**
  * 語音生成服務
  *
- * 透過後端伺服器 REST API 呼叫 Voicebox 語音克隆軟件。
- * Voicebox 伺服器位址由後端環境變數控制，不暴露給前端用戶。
- *
- * 後端 REST 端點：
- * - GET  /api/voicebox/health   — 健康檢查
- * - POST /api/voicebox/upload    — 上傳參考音檔建立聲音檔案
- * - POST /api/voicebox/generate  — 生成語音
+ * 整合 Voicebox 開源語音克隆軟件的 REST API。
+ * Voicebox 需在電腦上運行（http://localhost:17493），
+ * 本 APP 透過後端伺服器代理呼叫 Voicebox API。
  *
  * 若 Voicebox 未連線，則回退至模擬音檔（供測試用）。
  */
@@ -15,42 +11,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
-import * as Auth from "@/lib/_core/auth";
-
-/**
- * 取得後端 API 基礎 URL
- */
-function getBaseUrl(): string {
-  return getApiBaseUrl();
-}
-
-/**
- * 取得帶認證的 fetch headers
- */
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (Platform.OS !== "web") {
-    const token = await Auth.getSessionToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
-  return headers;
-}
-
-/**
- * 帶認證的 fetch 封裝
- */
-async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const headers = await getAuthHeaders();
-  return fetch(url, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string>) },
-    credentials: "include",
-  });
-}
 
 export interface VoiceGenerationParams {
   /** 參考音檔 URI（親友生前音檔） */
@@ -249,84 +209,21 @@ async function readAudioAsBase64(uri: string): Promise<string> {
 }
 
 /**
- * 檢查 Voicebox 服務是否在線（透過後端伺服器）
+ * 呼叫後端 tRPC API 生成語音
  */
-export async function checkVoiceboxStatus(): Promise<{
-  online: boolean;
-  profileCount?: number;
-}> {
-  try {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/api/voicebox/health`, {
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!response.ok) return { online: false };
-
-    const data = await response.json() as {
-      online: boolean;
-      profileCount?: number;
-    };
-    return {
-      online: data.online,
-      profileCount: data.profileCount,
-    };
-  } catch {
-    return { online: false };
-  }
-}
-
-/**
- * 透過後端伺服器上傳音檔到 Voicebox 建立聲音檔案
- */
-async function uploadProfileViaServer(
-  name: string,
-  audioBase64: string,
-  mimeType: string,
-): Promise<string | null> {
-  try {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/api/voicebox/upload`, {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        audioBase64,
-        mimeType,
-      }),
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json() as {
-      success: boolean;
-      profileId?: string;
-      error?: string;
-    };
-
-    if (data.success && data.profileId) {
-      return data.profileId;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 透過後端伺服器呼叫 Voicebox 生成語音
- */
-async function generateViaServer(
+async function callVoiceGenerateAPI(
   text: string,
   profileId: string,
-): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null } | null> {
+): Promise<{ audioBase64: string; duration: number | null } | null> {
   try {
-    const baseUrl = getBaseUrl();
-    const response = await authFetch(`${baseUrl}/api/voicebox/generate`, {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.generate`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        text,
-        profileId,
+        json: { text, profileId },
       }),
       signal: AbortSignal.timeout(120000),
     });
@@ -334,18 +231,14 @@ async function generateViaServer(
     if (!response.ok) return null;
 
     const data = await response.json() as {
-      success: boolean;
-      audioBase64?: string;
-      duration?: number;
-      storageUrl?: string | null;
-      error?: string;
+      result?: { data?: { json?: { success?: boolean; audioBase64?: string; duration?: number } } }
     };
+    const result = data?.result?.data?.json;
 
-    if (data.success && data.audioBase64) {
+    if (result?.success && result.audioBase64) {
       return {
-        audioBase64: data.audioBase64,
-        duration: data.duration ?? null,
-        storageUrl: data.storageUrl ?? null,
+        audioBase64: result.audioBase64,
+        duration: result.duration ?? null,
       };
     }
     return null;
@@ -355,12 +248,79 @@ async function generateViaServer(
 }
 
 /**
+ * 呼叫後端 tRPC API 上傳音檔並建立 Voicebox Profile
+ */
+async function callUploadProfileAPI(
+  name: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.uploadProfile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        json: { name, audioBase64, mimeType },
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      result?: { data?: { json?: { success?: boolean; profileId?: string } } }
+    };
+    const result = data?.result?.data?.json;
+
+    if (result?.success && result.profileId) {
+      return result.profileId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 檢查 Voicebox 服務是否在線
+ */
+export async function checkVoiceboxStatus(): Promise<{
+  online: boolean;
+  profileCount?: number;
+  url?: string;
+}> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const response = await fetch(`${apiBase}/api/trpc/voice.health`, {
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) return { online: false };
+
+    const data = await response.json() as {
+      result?: { data?: { json?: { online?: boolean; profileCount?: number; url?: string } } }
+    };
+    const result = data?.result?.data?.json;
+
+    return {
+      online: result?.online ?? false,
+      profileCount: result?.profileCount,
+      url: result?.url,
+    };
+  } catch {
+    return { online: false };
+  }
+}
+
+/**
  * 生成語音
  *
  * 流程：
- * 1. 讀取參考音檔 → 上傳至後端 → 建立 Voicebox 聲音檔案
- * 2. 呼叫後端生成 API → 取得 base64 音檔 → 儲存至本地
- * 3. 若後端/Voicebox 未連線，回退至模擬音檔
+ * 1. 嘗試呼叫後端 Voicebox API（若已連線）
+ * 2. 若 Voicebox 未連線，回退至模擬音檔
  */
 export async function generateSpeech(
   params: VoiceGenerationParams
@@ -392,7 +352,7 @@ export async function generateSpeech(
 
       const audioBase64 = await readAudioAsBase64(params.referenceAudioUri);
       const profileName = `echo_${timestamp}`;
-      voiceProfileId = await uploadProfileViaServer(profileName, audioBase64, mimeType) ?? undefined;
+      voiceProfileId = await callUploadProfileAPI(profileName, audioBase64, mimeType) ?? undefined;
     } catch {
       // 上傳失敗，繼續使用模擬
     }
@@ -405,7 +365,7 @@ export async function generateSpeech(
 
     if (onProgress) onProgress(50, "AI 語音克隆生成中...");
 
-    const result = await generateViaServer(params.text, voiceProfileId);
+    const result = await callVoiceGenerateAPI(params.text, voiceProfileId);
 
     if (result) {
       if (onProgress) onProgress(85, "後處理音質優化...");
@@ -431,90 +391,13 @@ export async function generateSpeech(
     }
   }
 
-  // === 回退：模擬音檔（Voicebox 未連線時） ===
-  if (onProgress) onProgress(40, "提取音色特徵...");
-  await new Promise((resolve) => setTimeout(resolve, 700));
-
-  if (onProgress) onProgress(60, "生成語音波形...");
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
-  if (onProgress) onProgress(80, "優化音質...");
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  if (onProgress) onProgress(90, "儲存音檔...");
-
-  // 生成模擬音檔（正弦波）
-  const sampleRate = 22050;
-  const estimatedDuration = Math.max(2, Math.ceil(params.text.length * 0.15));
-  const numSamples = sampleRate * estimatedDuration;
-  const dataSize = numSamples * 2;
-
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  view.setUint32(0, 0x52494646, false);
-  view.setUint32(4, 36 + dataSize, true);
-  view.setUint32(8, 0x57415645, false);
-  view.setUint32(12, 0x666d7420, false);
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  view.setUint32(36, 0x64617461, false);
-  view.setUint32(40, dataSize, true);
-
-  const baseFreq = 180;
-  const harmonics = [1, 2, 3];
-  const harmonicWeights = [0.5, 0.2, 0.1];
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const progress = i / numSamples;
-    let envelope = 1.0;
-    const fadeDuration = 0.1;
-    if (progress < fadeDuration) {
-      envelope = progress / fadeDuration;
-    } else if (progress > 1 - fadeDuration) {
-      envelope = (1 - progress) / fadeDuration;
-    }
-    const syllableRate = 3.5;
-    const syllablePhase = (t * syllableRate) % 1;
-    const syllableEnvelope = syllablePhase < 0.7 ? 1.0 : 0.3;
-    let sample = 0;
-    for (let h = 0; h < harmonics.length; h++) {
-      const freq = baseFreq * harmonics[h];
-      const freqMod = freq * (1 + 0.05 * Math.sin(t * 2));
-      sample += harmonicWeights[h] * Math.sin(2 * Math.PI * freqMod * t);
-    }
-    sample *= envelope * syllableEnvelope * 0.6;
-    const intSample = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
-    view.setInt16(44 + i * 2, intSample, true);
-  }
-
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  const chunkSize = 8192;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode.apply(null, Array.from(chunk));
-  }
-  const base64 = btoa(binary);
-
-  await FileSystem.writeAsStringAsync(outputPath, base64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  if (onProgress) onProgress(100, "完成");
-
-  return {
-    audioUri: outputPath,
-    duration: estimatedDuration,
-    createdAt: timestamp,
-    isRealVoice: false,
-  };
+  // Voicebox 未連線或生成失敗，拋出錯誤（不再產生模擬音檔）
+  if (onProgress) onProgress(100, "生成失敗");
+  throw new Error(
+    voiceProfileId
+      ? "語音生成失敗，請確認 Voicebox 伺服器正常運作後再試。"
+      : "無法連接語音克隆伺服器，請稍後再試。"
+  );
 }
 
 /**

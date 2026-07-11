@@ -1,30 +1,35 @@
 import { describe, it, expect } from "vitest";
 
-/**
- * 驗證 Voicebox 伺服器連線設定
- * 確保 VOICEBOX_URL 環境變數已正確設定且後端可連線
- */
-describe("Voicebox 連線驗證", () => {
-  it("VOICEBOX_URL 環境變數應已設定", () => {
-    const url = process.env.VOICEBOX_URL;
-    expect(url).toBeTruthy();
-    expect(url).toMatch(/^https?:\/\//);
+describe("Voicebox health endpoint", () => {
+  it("should return online status from the backend proxy", async () => {
+    const baseUrl = process.env.API_BASE_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/voicebox/health`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    expect(response.ok).toBe(true);
+    const data = await response.json() as {
+      online: boolean;
+      url?: string;
+      profileCount?: number;
+      error?: string;
+    };
+
+    // Voicebox should be online if VOICEBOX_URL is correctly set
+    expect(data).toHaveProperty("online");
+    if (data.online) {
+      expect(data.url).toBeDefined();
+      expect(typeof data.profileCount).toBe("number");
+    }
   });
 
-  it("後端 /api/voicebox/health 應回傳連線狀態", async () => {
-    const apiUrl = "http://localhost:3000/api/voicebox/health";
-    try {
-      const response = await fetch(apiUrl, {
-        signal: AbortSignal.timeout(10000),
-      });
-      expect(response.ok).toBe(true);
-      const data = await response.json() as { online: boolean; url?: string };
-      // 即使 Voicebox 離線，API 也應正常回應
-      expect(data).toHaveProperty("online");
-    } catch {
-      // 後端伺服器可能未在此測試環境中運行，跳過連線檢查
-      // 但環境變數必須存在（上一個測試已驗證）
-      expect(true).toBe(true);
-    }
+  it("should have VOICEBOX_URL environment variable set", () => {
+    // This verifies the secret was properly configured
+    const voiceboxUrl = process.env.VOICEBOX_URL;
+    expect(voiceboxUrl).toBeDefined();
+    expect(voiceboxUrl).toContain("ngrok-free.dev");
   });
 });
