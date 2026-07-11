@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,12 @@ import {
   TextInput,
   Modal,
   FlatList,
+  PanResponder,
+  LayoutChangeEvent,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from "expo-audio";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -38,37 +40,95 @@ export default function ResultScreen() {
   }>();
   const isRealVoice = params.isRealVoice === "1";
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [showTagInput, setShowTagInput] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [showTitleEdit, setShowTitleEdit] = useState(false);
   const [titleInput, setTitleInput] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
   const player = useAudioPlayer({ uri: params.audioUri });
+  const status = useAudioPlayerStatus(player);
+
+  // 進度條拖動相關
+  const progressBarWidth = useRef(0);
+  const isSeeking = useRef(false);
+  const [seekProgress, setSeekProgress] = useState(0);
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true });
   }, []);
 
+  const isPlaying = status.playing;
+  const currentTime = status.currentTime;
+  const duration = status.duration > 0 ? status.duration : (Number(params.duration) || 0);
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   const togglePlay = useCallback(async () => {
     try {
       if (isPlaying) {
         player.pause();
-        setIsPlaying(false);
       } else {
+        // 如果已播放完畢，從頭開始
+        if (duration > 0 && currentTime >= duration - 0.5) {
+          player.seekTo(0);
+        }
         player.play();
-        setIsPlaying(true);
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }
-    } catch (err) {
+    } catch {
       Alert.alert("播放錯誤", "無法播放此音檔");
     }
-  }, [isPlaying, player]);
+  }, [isPlaying, player, currentTime, duration]);
+
+  // 進度條 PanResponder — 支援拖動 seek
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        isSeeking.current = true;
+        if (progressBarWidth.current > 0) {
+          const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidth.current));
+          setSeekProgress(ratio * 100);
+        }
+      },
+      onPanResponderMove: (evt) => {
+        if (progressBarWidth.current > 0) {
+          const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidth.current));
+          setSeekProgress(ratio * 100);
+        }
+      },
+      onPanResponderRelease: (evt) => {
+        if (progressBarWidth.current > 0 && duration > 0) {
+          const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidth.current));
+          const seekTime = ratio * duration;
+          player.seekTo(seekTime);
+          if (Platform.OS !== "web") {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+        }
+        isSeeking.current = false;
+      },
+    })
+  ).current;
+
+  const onProgressBarLayout = useCallback((e: LayoutChangeEvent) => {
+    progressBarWidth.current = e.nativeEvent.layout.width;
+  }, []);
+
+  const displayProgress = isSeeking.current ? seekProgress : progressPercent;
+  const displayCurrentTime = isSeeking.current && duration > 0
+    ? (seekProgress / 100) * duration
+    : currentTime;
 
   const handleDownload = useCallback(async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
     try {
       const fileName = `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}.wav`;
       const downloadDir = `${FileSystem.documentDirectory}downloads/`;
@@ -82,13 +142,17 @@ export default function ResultScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      Alert.alert("下載完成", `音檔已儲存至：${destPath}`);
-    } catch (err) {
-      Alert.alert("下載失敗", "無法下載此音檔");
+      Alert.alert("下載完成", `音檔已儲存至：\n${destPath}`);
+    } catch {
+      Alert.alert("下載失敗", "無法下載此音檔，請重試");
+    } finally {
+      setIsDownloading(false);
     }
-  }, [params.audioUri, params.createdAt]);
+  }, [params.audioUri, params.createdAt, isDownloading]);
 
   const handleShare = useCallback(async () => {
+    if (isSharing) return;
+    setIsSharing(true);
     try {
       if (Platform.OS === "web") {
         if (!(await Sharing.isAvailableAsync())) {
@@ -101,10 +165,12 @@ export default function ResultScreen() {
         mimeType: "audio/wav",
         UTI: "com.microsoft.waveform",
       });
-    } catch (err) {
-      Alert.alert("分享失敗", "無法分享此音檔");
+    } catch {
+      Alert.alert("分享失敗", "無法分享此音檔，請重試");
+    } finally {
+      setIsSharing(false);
     }
-  }, [params.audioUri]);
+  }, [params.audioUri, isSharing]);
 
   const handleRegenerate = useCallback(() => {
     router.back();
@@ -157,7 +223,6 @@ export default function ResultScreen() {
     }
   }, [tags, params.entryId]);
 
-  const duration = Number(params.duration) || 0;
   const createdAt = Number(params.createdAt) || Date.now();
 
   const renderTag = ({ item }: { item: string }) => (
@@ -209,47 +274,116 @@ export default function ResultScreen() {
               </Text>
             </View>
 
-            {/* 進度條 */}
+            {/* 進度條 — 可拖動 seek */}
             <View style={styles.progressSection}>
-              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-                <View style={[styles.progressFill, { backgroundColor: colors.primary, width: isPlaying ? "60%" : "0%" }]} />
+              <View
+                style={[styles.progressTrack, { backgroundColor: colors.border }]}
+                onLayout={onProgressBarLayout}
+                {...panResponder.panHandlers}
+              >
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: colors.primary,
+                      width: `${displayProgress}%`,
+                    },
+                  ]}
+                />
+                {/* 拖動圓點 */}
+                <View
+                  style={[
+                    styles.progressThumb,
+                    {
+                      left: `${displayProgress}%`,
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                />
               </View>
               <View style={styles.timeRow}>
-                <Text style={[styles.timeText, { color: colors.muted }]}>0:00</Text>
+                <Text style={[styles.timeText, { color: colors.muted }]}>
+                  {formatDuration(displayCurrentTime)}
+                </Text>
                 <Text style={[styles.timeText, { color: colors.muted }]}>
                   {formatDuration(duration)}
                 </Text>
               </View>
             </View>
 
-            {/* 播放按鈕 */}
-            <TouchableOpacity
-              onPress={togglePlay}
-              style={[styles.playButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
-            >
-              <IconSymbol
-                name={isPlaying ? "pause.fill" : "play.fill"}
-                size={36}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
+            {/* 播放控制按鈕 */}
+            <View style={styles.playControlRow}>
+              {/* 後退 10 秒 */}
+              <TouchableOpacity
+                onPress={() => {
+                  const newTime = Math.max(0, currentTime - 10);
+                  player.seekTo(newTime);
+                  if (Platform.OS !== "web") {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                }}
+                style={styles.skipButton}
+              >
+                <IconSymbol name="gobackward.10" size={28} color={colors.foreground} />
+              </TouchableOpacity>
+
+              {/* 主播放/暫停按鈕 */}
+              <TouchableOpacity
+                onPress={togglePlay}
+                style={[styles.playButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+              >
+                <IconSymbol
+                  name={isPlaying ? "pause.fill" : "play.fill"}
+                  size={36}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              {/* 前進 10 秒 */}
+              <TouchableOpacity
+                onPress={() => {
+                  const newTime = Math.min(duration, currentTime + 10);
+                  player.seekTo(newTime);
+                  if (Platform.OS !== "web") {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
+                }}
+                style={styles.skipButton}
+              >
+                <IconSymbol name="goforward.10" size={28} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
 
             {/* 操作按鈕列 */}
             <View style={styles.actionRow}>
               <TouchableOpacity
                 onPress={handleDownload}
+                disabled={isDownloading}
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
-                <IconSymbol name="arrow.down.to.line" size={24} color={colors.foreground} />
-                <Text style={[styles.actionLabel, { color: colors.muted }]}>下載</Text>
+                <IconSymbol
+                  name={isDownloading ? "arrow.triangle.2.circlepath" : "arrow.down.to.line"}
+                  size={24}
+                  color={isDownloading ? colors.muted : colors.foreground}
+                />
+                <Text style={[styles.actionLabel, { color: colors.muted }]}>
+                  {isDownloading ? "下載中" : "下載"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleShare}
+                disabled={isSharing}
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
-                <IconSymbol name="square.and.arrow.up" size={24} color={colors.foreground} />
-                <Text style={[styles.actionLabel, { color: colors.muted }]}>分享</Text>
+                <IconSymbol
+                  name={isSharing ? "arrow.triangle.2.circlepath" : "square.and.arrow.up"}
+                  size={24}
+                  color={isSharing ? colors.muted : colors.foreground}
+                />
+                <Text style={[styles.actionLabel, { color: colors.muted }]}>
+                  {isSharing ? "分享中" : "分享"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -490,13 +624,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    overflow: "hidden",
+    height: 6,
+    borderRadius: 3,
+    overflow: "visible",
+    justifyContent: "center",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 2,
+    borderRadius: 3,
+  },
+  progressThumb: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   timeRow: {
     flexDirection: "row",
@@ -504,6 +651,19 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 13,
+    fontVariant: ["tabular-nums"],
+  },
+  playControlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 32,
+  },
+  skipButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   playButton: {
     width: 72,

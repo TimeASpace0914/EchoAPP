@@ -43,6 +43,9 @@ const MAPPING = {
   "pencil": "edit",
   "folder": "folder",
   "magnifyingglass": "search",
+  "gobackward.10": "replay-10",
+  "goforward.10": "forward-10",
+  "arrow.triangle.2.circlepath": "autorenew",
 } as unknown as IconMapping;
 
 /**
