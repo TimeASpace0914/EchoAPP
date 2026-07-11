@@ -90,3 +90,10 @@
 - [x] 加入 KeyboardAvoidingView 解決鍵盤擋住輸入框
 - [x] 預設改為淺色模式
 - [x] 端到端測試通過（upload → generate → 取得音檔 348KB, 5.44s）
+
+## 第十二輪需求（修復上傳失敗 + 錯誤詳情顯示 + 流程優化）
+- [x] 修復 voicebox.ts multipart 上傳的副檔名映射（mpeg→mp3, mp4→m4a）
+- [x] voice-service.ts 錯誤訊息包含 details 讓用戶看到具體原因
+- [x] 加入手動 multipart 構建替代 FormData/Blob（更可靠）
+- [x] 加入詳細日誌方便排查
+- [x] 端到端測試通過（upload → generate → 358KB 音檔, 5.6s）

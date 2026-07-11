@@ -117,24 +117,62 @@ export async function uploadVoiceProfile(
     };
   }
 
-  // 步驟 2：上傳參考音檔（multipart form-data）
+  // 步驟 2：上傳參考音檔（手動構建 multipart/form-data，更可靠）
   try {
     const binaryData = Buffer.from(audioBase64, "base64");
-    const ext = mimeType.split("/")[1]?.split("-")[0] || "wav";
-    const formData = new FormData();
-    const audioBlob = new Blob([binaryData], { type: mimeType });
-    formData.append("file", audioBlob, `reference.${ext}`);
-    formData.append("reference_text", "參考音檔");
-
+    
+    // 正確映射 MIME type 到副檔名
+    const extMap: Record<string, string> = {
+      "audio/wav": "wav",
+      "audio/mpeg": "mp3",
+      "audio/mp4": "m4a",
+      "audio/aac": "aac",
+      "audio/flac": "flac",
+      "audio/ogg": "ogg",
+      "audio/x-wma": "wma",
+    };
+    const ext = extMap[mimeType] || "wav";
+    const fileName = `reference.${ext}`;
+    
+    // 手動構建 multipart/form-data
+    const boundary = `----VoiceboxBoundary${Date.now()}${Math.random().toString(36).slice(2)}`;
+    
+    // file part
+    const fileHeader = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+      `Content-Type: ${mimeType}\r\n\r\n`
+    );
+    const fileFooter = Buffer.from("\r\n");
+    
+    // reference_text part
+    const textPart = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
+      `參考音檔\r\n`
+    );
+    
+    // ending boundary
+    const endBoundary = Buffer.from(`--${boundary}--\r\n`);
+    
+    // 組合所有部分
+    const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
+    
+    console.log(`[Voicebox] Uploading sample: profile=${profileId}, file=${fileName}, size=${binaryData.length}bytes, mimeType=${mimeType}`);
+    
     const sampleRes = await fetch(`${baseUrl}/profiles/${profileId}/samples`, {
       method: "POST",
-      headers: NGROK_HEADERS,
-      body: formData,
+      headers: {
+        ...NGROK_HEADERS,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: multipartBody,
       signal: createTimeoutSignal(60000),
     });
 
     if (!sampleRes.ok) {
       const errText = await sampleRes.text().catch(() => "");
+      console.error(`[Voicebox] Sample upload failed: HTTP ${sampleRes.status}: ${errText}`);
       return {
         error: "上傳參考音檔失敗",
         code: "UPLOAD_FAILED",
@@ -142,8 +180,10 @@ export async function uploadVoiceProfile(
       };
     }
 
+    console.log(`[Voicebox] Sample uploaded successfully for profile ${profileId}`);
     return { profile_id: profileId, name };
   } catch (error) {
+    console.error(`[Voicebox] Sample upload error:`, error instanceof Error ? error.message : error);
     return {
       error: "上傳參考音檔時發生錯誤",
       code: "UPLOAD_FAILED",

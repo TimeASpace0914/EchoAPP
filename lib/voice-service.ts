@@ -249,7 +249,8 @@ async function restUploadProfile(
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
     const msg = errBody.error || `伺服器回應錯誤 (HTTP ${response.status})`;
-    throw new Error(`聲音檔案建立失敗：${msg}`);
+    const details = errBody.details ? `（${errBody.details}）` : "";
+    throw new Error(`聲音檔案建立失敗：${msg}${details}`);
   }
 
   const data = await response.json() as {
@@ -296,7 +297,8 @@ async function restGenerateSpeech(
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
     const msg = errBody.error || `伺服器回應錯誤 (HTTP ${response.status})`;
-    throw new Error(`語音生成失敗：${msg}`);
+    const details = errBody.details ? `（${errBody.details}）` : "";
+    throw new Error(`語音生成失敗：${msg}${details}`);
   }
 
   const data = await response.json() as {
