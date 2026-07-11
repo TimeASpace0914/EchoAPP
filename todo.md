@@ -46,3 +46,11 @@
 - [x] 建立 /api/voicebox/* 後端 API 端點（健康檢查、聲音檔案、生成）
 - [x] APP 前端更新呼叫後端 API 實現真實語音克隆
 - [x] 結果頁顯示語音來源標示（Voicebox AI / 模擬語音）
+
+## 第六輪需求（Voicebox 直連架構）
+- [x] 前端語音服務改為直接呼叫 Voicebox REST API
+- [x] 設定頁面加入 Voicebox URL 輸入框與連線測試
+- [x] 主控台顯示 Voicebox 連線狀態（使用設定中的 URL）
+- [x] AsyncStorage 儲存 Voicebox URL 設定
+- [x] wifi 圖示映射加入 icon-symbol.tsx
+- [x] 主控台使用 useFocusEffect 在返回時重新檢查連線狀態

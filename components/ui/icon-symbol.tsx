@@ -43,6 +43,7 @@ const MAPPING = {
   "pencil": "edit",
   "folder": "folder",
   "magnifyingglass": "search",
+  "wifi": "wifi",
 } as unknown as IconMapping;
 
 /**

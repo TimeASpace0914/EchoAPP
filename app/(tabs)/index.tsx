@@ -12,7 +12,7 @@ import {
   Modal,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 
@@ -46,12 +46,14 @@ export default function HomeScreen() {
   const [genStage, setGenStage] = useState("");
   const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
 
-  // 檢查 Voicebox 連線狀態
-  useEffect(() => {
-    checkVoiceboxStatus().then((status) => {
-      setVoiceboxOnline(status.online);
-    }).catch(() => setVoiceboxOnline(false));
-  }, []);
+  // 每次頁面被聚焦時重新檢查 Voicebox 連線狀態（從設定頁返回時也會更新）
+  useFocusEffect(
+    useCallback(() => {
+      checkVoiceboxStatus().then((status) => {
+        setVoiceboxOnline(status.online);
+      }).catch(() => setVoiceboxOnline(false));
+    }, [])
+  );
 
   const previewPlayer = useAudioPlayer(audioUri ? { uri: audioUri } : null);
 
