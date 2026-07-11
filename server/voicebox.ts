@@ -19,7 +19,8 @@ import os from "os";
 const execFileAsync = promisify(execFile);
 
 /**
- * 使用 ffmpeg 將任意音檔格式轉換為 WAV（16kHz, mono, 16-bit）
+ * 使用 ffmpeg 將任意音檔格式轉換為 WAV
+ * 保留原始採樣率和聲道數，只轉換容器格式為 WAV。
  * Voicebox 對 WAV 格式的相容性最佳，M4A/MP4 等容器常被拒絕。
  */
 async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buffer> {
@@ -32,12 +33,11 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
     fs.writeFileSync(inputPath, inputBuffer);
 
     // 使用 ffmpeg 轉換為標準 WAV 格式
+    // 保留原始採樣率和聲道數，只轉容器格式，避免品質損失
     await execFileAsync("ffmpeg", [
       "-y",               // 覆寫輸出
       "-i", inputPath,     // 輸入
-      "-ar", "16000",      // 採樣率 16kHz
-      "-ac", "1",           // 單聲道
-      "-sample_fmt", "s16", // 16-bit PCM
+      "-c:a", "pcm_s16le",  // 音頻編碼：16-bit PCM little-endian
       "-f", "wav",          // 輸出格式
       outputPath,
     ], { timeout: 30000 });
@@ -307,7 +307,7 @@ export async function generateVoiceboxSpeech(
         profile_id: request.profile_id,
         ...(request.speed !== undefined && { speed: request.speed }),
       }),
-    }, 30000, 2);
+    }, 120000, 3);
 
     if (!genRes.ok) {
       const errText = await genRes.text().catch(() => "");
@@ -394,7 +394,33 @@ export async function generateVoiceboxSpeech(
     }
 
     const audioBuffer = await audioRes.arrayBuffer();
-    const audioBase64 = Buffer.from(audioBuffer).toString("base64");
+    const audioBytes = Buffer.from(audioBuffer);
+    
+    // 記錄音檔格式資訊，便於診斷
+    const contentType = audioRes.headers.get("content-type") || "unknown";
+    const headerHex = audioBytes.slice(0, 16).toString("hex");
+    console.log(`[Voicebox] Audio downloaded: ${audioBytes.length}bytes, content-type=${contentType}, header=${headerHex}`);
+    
+    // 驗證音檔有效性：必須有足夠的大小且包含有效的音檔 header
+    if (audioBytes.length < 100) {
+      console.error(`[Voicebox] Audio too small: ${audioBytes.length}bytes, likely corrupted`);
+      return {
+        error: "生成的音檔資料不完整，請重試",
+        code: "GENERATION_FAILED",
+        details: `Audio size only ${audioBytes.length} bytes`,
+      };
+    }
+    
+    // 檢查是否為有效的音檔格式（WAV RIFF header 或 MP3 ID3 tag）
+    const isWav = audioBytes.slice(0, 4).toString("ascii") === "RIFF";
+    const isMp3 = audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33; // ID3
+    
+    if (!isWav && !isMp3) {
+      console.warn(`[Voicebox] Unknown audio format, header=${headerHex}, size=${audioBytes.length}`);
+      // 不阻擋，但記錄警告 — Voicebox 可能回傳非標準格式
+    }
+    
+    const audioBase64 = audioBytes.toString("base64");
 
     return {
       audio: audioBase64,

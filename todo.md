@@ -107,7 +107,7 @@
 - [x] 端到端後端測試通過（WAV 上傳 → 生成 → 取得音檔成功）
 - [x] TypeScript 型別檢查通過（0 errors）
 
-## 第十四輪需求（修復 ngrok 連線不穩 + 格式提示溢出）
+## 第十五輪需求（修復 ngrok 連線不穩 + 格式提示溢出）
 - [x] 後端加入 fetchWithRetry 函數（ngrok 斷線時自動重試 2 次 + backoff）
 - [x] 後端所有 Voicebox API 呼叫改用 fetchWithRetry（upload/generate/health/polling）
 - [x] 後端 timeout 延長（建立 Profile 30s、上傳音檔 90s、生成 30s、輪詢 15s、下載音檔 30s）
@@ -125,3 +125,11 @@
 - [x] formatHintText 加入 flexShrink: 1 + flexWrap: "wrap" 防止文字溢出
 - [x] formatHintRow 加入 flexWrap: "wrap" 讓整行可換行
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第十六輪需求（音檔品質修復 + timeout 優化）
+- [x] ffmpeg 轉換保留原始採樣率和聲道數（移除 -ar 16000 -ac 1，只轉容器格式）
+- [x] 後端 POST /generate timeout 從 30s 增加到 120s + 重試 3 次
+- [x] 前端 restGenerateSpeech timeout 從 300s 增加到 600s（10 分鐘）
+- [x] 後端音檔下載加入格式驗證與診斷 log（content-type + header hex）
+- [x] 後端音檔大小驗證（< 100 bytes 視為損壞）
+- [x] 直撥 Voicebox API 端到端測試通過（兩次生成均正常，RMS > 5000）
