@@ -1,48 +1,55 @@
 /**
  * 語音生成服務
  *
- * 整合 Voicebox 開源語音克隆軟件的 REST API。
- * Voicebox 需在電腦上運行（預設 http://localhost:17493），
- * APP 直接呼叫 Voicebox REST API 進行語音克隆。
+ * 透過後端伺服器 REST API 呼叫 Voicebox 語音克隆軟件。
+ * Voicebox 伺服器位址由後端環境變數控制，不暴露給前端用戶。
  *
- * 用戶可在設定頁面配置 Voicebox 伺服器位址，
- * 其他用戶只需下載 APP 並連接至伺服器即可使用。
+ * 後端 REST 端點：
+ * - GET  /api/voicebox/health   — 健康檢查
+ * - POST /api/voicebox/upload    — 上傳參考音檔建立聲音檔案
+ * - POST /api/voicebox/generate  — 生成語音
  *
  * 若 Voicebox 未連線，則回退至模擬音檔（供測試用）。
  */
 
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const VOICEBOX_URL_KEY = "@echo_voicebox_url";
-const DEFAULT_VOICEBOX_URL = "http://localhost:17493";
+import { getApiBaseUrl } from "@/constants/oauth";
+import * as Auth from "@/lib/_core/auth";
 
 /**
- * 取得 Voicebox 伺服器位址
+ * 取得後端 API 基礎 URL
  */
-export async function getVoiceboxUrl(): Promise<string> {
-  try {
-    const url = await AsyncStorage.getItem(VOICEBOX_URL_KEY);
-    return url || DEFAULT_VOICEBOX_URL;
-  } catch {
-    return DEFAULT_VOICEBOX_URL;
+function getBaseUrl(): string {
+  return getApiBaseUrl();
+}
+
+/**
+ * 取得帶認證的 fetch headers
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (Platform.OS !== "web") {
+    const token = await Auth.getSessionToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
+  return headers;
 }
 
 /**
- * 設定 Voicebox 伺服器位址
+ * 帶認證的 fetch 封裝
  */
-export async function setVoiceboxUrl(url: string): Promise<void> {
-  const cleanUrl = url.trim().replace(/\/+$/, "");
-  await AsyncStorage.setItem(VOICEBOX_URL_KEY, cleanUrl);
-}
-
-/**
- * 重置 Voicebox 伺服器位址為預設值
- */
-export async function resetVoiceboxUrl(): Promise<void> {
-  await AsyncStorage.removeItem(VOICEBOX_URL_KEY);
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = await getAuthHeaders();
+  return fetch(url, {
+    ...options,
+    headers: { ...headers, ...(options.headers as Record<string, string>) },
+    credentials: "include",
+  });
 }
 
 export interface VoiceGenerationParams {
@@ -242,22 +249,84 @@ async function readAudioAsBase64(uri: string): Promise<string> {
 }
 
 /**
- * 直接呼叫 Voicebox REST API 生成語音
+ * 檢查 Voicebox 服務是否在線（透過後端伺服器）
  */
-async function callVoiceboxGenerate(
+export async function checkVoiceboxStatus(): Promise<{
+  online: boolean;
+  profileCount?: number;
+}> {
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await authFetch(`${baseUrl}/api/voicebox/health`, {
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) return { online: false };
+
+    const data = await response.json() as {
+      online: boolean;
+      profileCount?: number;
+    };
+    return {
+      online: data.online,
+      profileCount: data.profileCount,
+    };
+  } catch {
+    return { online: false };
+  }
+}
+
+/**
+ * 透過後端伺服器上傳音檔到 Voicebox 建立聲音檔案
+ */
+async function uploadProfileViaServer(
+  name: string,
+  audioBase64: string,
+  mimeType: string,
+): Promise<string | null> {
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await authFetch(`${baseUrl}/api/voicebox/upload`, {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        audioBase64,
+        mimeType,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      success: boolean;
+      profileId?: string;
+      error?: string;
+    };
+
+    if (data.success && data.profileId) {
+      return data.profileId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 透過後端伺服器呼叫 Voicebox 生成語音
+ */
+async function generateViaServer(
   text: string,
   profileId: string,
-): Promise<{ audioBase64: string; duration: number | null } | null> {
+): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null } | null> {
   try {
-    const baseUrl = await getVoiceboxUrl();
-    const response = await fetch(`${baseUrl}/generate`, {
+    const baseUrl = getBaseUrl();
+    const response = await authFetch(`${baseUrl}/api/voicebox/generate`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         text,
-        profile_id: profileId,
+        profileId,
       }),
       signal: AbortSignal.timeout(120000),
     });
@@ -265,14 +334,18 @@ async function callVoiceboxGenerate(
     if (!response.ok) return null;
 
     const data = await response.json() as {
-      audio?: string;
+      success: boolean;
+      audioBase64?: string;
       duration?: number;
+      storageUrl?: string | null;
+      error?: string;
     };
 
-    if (data.audio) {
+    if (data.success && data.audioBase64) {
       return {
-        audioBase64: data.audio,
+        audioBase64: data.audioBase64,
         duration: data.duration ?? null,
+        storageUrl: data.storageUrl ?? null,
       };
     }
     return null;
@@ -282,74 +355,12 @@ async function callVoiceboxGenerate(
 }
 
 /**
- * 直接呼叫 Voicebox REST API 上傳音檔並建立聲音檔案
- */
-async function callVoiceboxUploadProfile(
-  name: string,
-  audioBase64: string,
-  mimeType: string,
-): Promise<string | null> {
-  try {
-    const baseUrl = await getVoiceboxUrl();
-    const binaryData = atob(audioBase64);
-    const bytes = new Uint8Array(binaryData.length);
-    for (let i = 0; i < binaryData.length; i++) {
-      bytes[i] = binaryData.charCodeAt(i);
-    }
-    const ext = mimeType.split("/")[1] || "wav";
-    const blob = new Blob([bytes], { type: mimeType });
-    const formData = new FormData();
-    formData.append("file", blob, `reference.${ext}`);
-    formData.append("name", name);
-
-    const response = await fetch(`${baseUrl}/profiles`, {
-      method: "POST",
-      body: formData,
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json() as { id?: string };
-    return data.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 檢查 Voicebox 服務是否在線（直接呼叫 Voicebox API）
- */
-export async function checkVoiceboxStatus(): Promise<{
-  online: boolean;
-  profileCount?: number;
-  url?: string;
-}> {
-  try {
-    const baseUrl = await getVoiceboxUrl();
-    const response = await fetch(`${baseUrl}/profiles`, {
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) return { online: false, url: baseUrl };
-
-    const profiles = await response.json() as any[];
-    return {
-      online: true,
-      profileCount: Array.isArray(profiles) ? profiles.length : 0,
-      url: baseUrl,
-    };
-  } catch {
-    return { online: false };
-  }
-}
-
-/**
  * 生成語音
  *
  * 流程：
- * 1. 嘗試呼叫後端 Voicebox API（若已連線）
- * 2. 若 Voicebox 未連線，回退至模擬音檔
+ * 1. 讀取參考音檔 → 上傳至後端 → 建立 Voicebox 聲音檔案
+ * 2. 呼叫後端生成 API → 取得 base64 音檔 → 儲存至本地
+ * 3. 若後端/Voicebox 未連線，回退至模擬音檔
  */
 export async function generateSpeech(
   params: VoiceGenerationParams
@@ -381,7 +392,7 @@ export async function generateSpeech(
 
       const audioBase64 = await readAudioAsBase64(params.referenceAudioUri);
       const profileName = `echo_${timestamp}`;
-      voiceProfileId = await callVoiceboxUploadProfile(profileName, audioBase64, mimeType) ?? undefined;
+      voiceProfileId = await uploadProfileViaServer(profileName, audioBase64, mimeType) ?? undefined;
     } catch {
       // 上傳失敗，繼續使用模擬
     }
@@ -394,7 +405,7 @@ export async function generateSpeech(
 
     if (onProgress) onProgress(50, "AI 語音克隆生成中...");
 
-    const result = await callVoiceboxGenerate(params.text, voiceProfileId);
+    const result = await generateViaServer(params.text, voiceProfileId);
 
     if (result) {
       if (onProgress) onProgress(85, "後處理音質優化...");

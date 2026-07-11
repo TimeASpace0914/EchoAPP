@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { checkVoiceboxHealth, uploadVoiceProfile, generateVoiceboxSpeech } from "../voicebox";
+import { storagePut } from "../storage";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -60,6 +62,79 @@ async function startServer() {
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
+  });
+
+  // ─── Voicebox REST 端點（供 APP 直接呼叫） ──────────────────────────────
+  // Voicebox 伺服器位址由後端環境變數控制，不暴露給前端
+  app.get("/api/voicebox/health", async (_req, res) => {
+    try {
+      const status = await checkVoiceboxHealth();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ online: false, error: error instanceof Error ? error.message : "未知錯誤" });
+    }
+  });
+
+  app.post("/api/voicebox/upload", async (req, res) => {
+    try {
+      const { name, audioBase64, mimeType } = req.body as {
+        name: string;
+        audioBase64: string;
+        mimeType?: string;
+      };
+      if (!name || !audioBase64) {
+        res.status(400).json({ success: false, error: "缺少必要參數 name 或 audioBase64" });
+        return;
+      }
+      const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav");
+      if ("error" in result) {
+        res.status(502).json({ success: false, error: result.error, details: result.details });
+        return;
+      }
+      res.json({ success: true, profileId: result.profile_id, name: result.name });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error instanceof Error ? error.message : "未知錯誤" });
+    }
+  });
+
+  app.post("/api/voicebox/generate", async (req, res) => {
+    try {
+      const { text, profileId, speed } = req.body as {
+        text: string;
+        profileId: string;
+        speed?: number;
+      };
+      if (!text || !profileId) {
+        res.status(400).json({ success: false, error: "缺少必要參數 text 或 profileId" });
+        return;
+      }
+      const result = await generateVoiceboxSpeech({
+        text,
+        profile_id: profileId,
+        ...(speed !== undefined && { speed }),
+      });
+      if ("error" in result) {
+        res.status(502).json({ success: false, error: result.error, details: result.details });
+        return;
+      }
+      // 同時上傳到 S3 儲存
+      let storageUrl: string | null = null;
+      try {
+        const audioBuffer = Buffer.from(result.audio, "base64");
+        const { url } = await storagePut(`voice-clone/${Date.now()}.wav`, audioBuffer, "audio/wav");
+        storageUrl = url;
+      } catch {
+        // 儲存失敗不影響主流程
+      }
+      res.json({
+        success: true,
+        audioBase64: result.audio,
+        duration: result.duration ?? null,
+        storageUrl,
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error instanceof Error ? error.message : "未知錯誤" });
+    }
   });
 
   app.use(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -6,9 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
-  TextInput,
-  ActivityIndicator,
-  Alert,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 
@@ -17,88 +14,14 @@ import { Logo } from "@/components/logo";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useThemeContext } from "@/lib/theme-provider";
-import {
-  getVoiceboxUrl,
-  setVoiceboxUrl,
-  resetVoiceboxUrl,
-  checkVoiceboxStatus,
-} from "@/lib/voice-service";
 
-type PageType = "menu" | "about" | "privacy" | "usage" | "voicebox";
+type PageType = "menu" | "about" | "privacy" | "usage";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const { colorScheme, setColorScheme } = useThemeContext();
   const [currentPage, setCurrentPage] = useState<PageType>("menu");
   const isDark = colorScheme === "dark";
-
-  // Voicebox 設定狀態
-  const [voiceboxUrlInput, setVoiceboxUrlInput] = useState("");
-  const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
-  const [voiceboxProfileCount, setVoiceboxProfileCount] = useState<number | undefined>(undefined);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [savingUrl, setSavingUrl] = useState(false);
-
-  const loadVoiceboxSettings = useCallback(async () => {
-    const url = await getVoiceboxUrl();
-    setVoiceboxUrlInput(url);
-  }, []);
-
-  useEffect(() => {
-    loadVoiceboxSettings();
-  }, [loadVoiceboxSettings]);
-
-  const handleTestConnection = async () => {
-    setTestingConnection(true);
-    setVoiceboxOnline(null);
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    try {
-      // 先儲存輸入的 URL
-      if (voiceboxUrlInput.trim()) {
-        await setVoiceboxUrl(voiceboxUrlInput.trim());
-      }
-      const status = await checkVoiceboxStatus();
-      setVoiceboxOnline(status.online);
-      setVoiceboxProfileCount(status.profileCount);
-      if (status.online) {
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      } else {
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }
-      }
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const handleSaveUrl = async () => {
-    setSavingUrl(true);
-    try {
-      await setVoiceboxUrl(voiceboxUrlInput.trim());
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      Alert.alert("儲存成功", "Voicebox 伺服器位址已更新");
-    } finally {
-      setSavingUrl(false);
-    }
-  };
-
-  const handleResetUrl = async () => {
-    await resetVoiceboxUrl();
-    const defaultUrl = await getVoiceboxUrl();
-    setVoiceboxUrlInput(defaultUrl);
-    setVoiceboxOnline(null);
-    setVoiceboxProfileCount(undefined);
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
 
   const navigateTo = (page: PageType) => {
     setCurrentPage(page);
@@ -133,12 +56,6 @@ export default function SettingsScreen() {
       label: "使用說明",
       subtitle: "快速上手指南",
       onPress: () => navigateTo("usage"),
-    },
-    {
-      icon: "wifi" as const,
-      label: "Voicebox 伺服器",
-      subtitle: "設定語音克隆伺服器位址",
-      onPress: () => navigateTo("voicebox"),
     },
   ];
 
@@ -292,119 +209,6 @@ export default function SettingsScreen() {
     );
   };
 
-  // === Voicebox 伺服器設定頁面 ===
-  const renderVoiceboxPage = () => (
-    <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
-      <Text style={[styles.pageHeading, { color: colors.foreground }]}>Voicebox 伺服器</Text>
-      <Text style={[styles.pageIntro, { color: colors.muted }]}>
-        設定 Voicebox 語音克隆伺服器位址，讓 APP 連接至伺服器進行真實 AI 語音克隆。
-      </Text>
-
-      {/* 連線狀態 */}
-      <View style={[styles.sectionCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>連線狀態</Text>
-        <View style={styles.voiceboxStatusRow}>
-          <View
-            style={[
-              styles.voiceboxStatusDot,
-              {
-                backgroundColor:
-                  voiceboxOnline === null
-                    ? colors.muted
-                    : voiceboxOnline
-                    ? "#4ADE80"
-                    : "#EF4444",
-              },
-            ]}
-          />
-          <Text style={[styles.voiceboxStatusText, { color: colors.foreground }]}>
-            {voiceboxOnline === null
-              ? "尚未測試"
-              : voiceboxOnline
-              ? `已連線${voiceboxProfileCount !== undefined ? `（${voiceboxProfileCount} 個聲音檔案）` : ""}`
-              : "無法連線"}
-          </Text>
-        </View>
-      </View>
-
-      {/* URL 輸入 */}
-      <View style={[styles.sectionCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>伺服器位址</Text>
-        <Text style={[styles.sectionBody, { color: colors.muted }]}>
-          輸入您的 Voicebox 伺服器位址（例如：http://192.168.1.100:17493）
-        </Text>
-        <TextInput
-          style={[
-            styles.voiceboxInput,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-              color: colors.foreground,
-            },
-          ]}
-          value={voiceboxUrlInput}
-          onChangeText={setVoiceboxUrlInput}
-          placeholder="http://localhost:17493"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          returnKeyType="done"
-        />
-
-        <View style={styles.voiceboxButtonRow}>
-          <TouchableOpacity
-            onPress={handleTestConnection}
-            disabled={testingConnection}
-            style={[styles.voiceboxTestBtn, { backgroundColor: colors.primary }]}
-          >
-            {testingConnection ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.voiceboxBtnText}>測試連線</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleSaveUrl}
-            disabled={savingUrl || !voiceboxUrlInput.trim()}
-            style={[styles.voiceboxSaveBtn, { borderColor: colors.primary }]}
-          >
-            <Text style={[styles.voiceboxBtnTextDark, { color: colors.primary }]}>
-              {savingUrl ? "儲存中..." : "儲存"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleResetUrl}
-            style={[styles.voiceboxResetBtn, { borderColor: colors.border }]}
-          >
-            <Text style={[styles.voiceboxBtnTextDark, { color: colors.muted }]}>重置</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 說明 */}
-      <View style={[styles.sectionCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>什麼是 Voicebox？</Text>
-        <Text style={[styles.sectionBody, { color: colors.foreground }]}>
-          Voicebox 是一款免費開源的語音克隆軟體，安裝在電腦上後會啟動本地 API 服務。迴響 APP 透過連接 Voicebox 伺服器，實現真實的 AI 語音克隆功能。
-        </Text>
-        <Text style={[styles.sectionBody, { color: colors.foreground }]}>
-          其他用戶只需下載迴響 APP 並連接至您的伺服器位址，即可使用語音克隆功能，無需各自安裝 Voicebox。
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        onPress={() => navigateTo("menu")}
-        style={[styles.backButton, { borderColor: colors.border }]}
-      >
-        <IconSymbol name="chevron.left" size={18} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>返回設定</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-
   // === 主選單頁面 ===
   const renderMenuPage = () => (
     <>
@@ -502,7 +306,7 @@ export default function SettingsScreen() {
           <View style={{ width: 40 }} />
         )}
         <Text style={[styles.navTitle, { color: colors.foreground }]}>
-          {currentPage === "menu" ? "設定" : currentPage === "about" ? "關於迴響" : currentPage === "privacy" ? "隱私政策" : currentPage === "usage" ? "使用說明" : "Voicebox 伺服器"}
+          {currentPage === "menu" ? "設定" : currentPage === "about" ? "關於迴響" : currentPage === "privacy" ? "隱私政策" : "使用說明"}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -511,7 +315,6 @@ export default function SettingsScreen() {
       {currentPage === "about" && renderAboutPage()}
       {currentPage === "privacy" && renderPrivacyPage()}
       {currentPage === "usage" && renderUsagePage()}
-      {currentPage === "voicebox" && renderVoiceboxPage()}
     </ScreenContainer>
   );
 }
@@ -725,65 +528,5 @@ const styles = StyleSheet.create({
     height: 20,
     alignSelf: "center",
     marginTop: 4,
-  },
-  // Voicebox 設定頁面樣式
-  voiceboxStatusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  voiceboxStatusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  voiceboxStatusText: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  voiceboxInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    marginTop: 8,
-  },
-  voiceboxButtonRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
-  },
-  voiceboxTestBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  voiceboxSaveBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
-  voiceboxResetBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
-  voiceboxBtnText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  voiceboxBtnTextDark: {
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

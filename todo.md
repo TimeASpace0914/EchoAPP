@@ -54,3 +54,10 @@
 - [x] AsyncStorage 儲存 Voicebox URL 設定
 - [x] wifi 圖示映射加入 icon-symbol.tsx
 - [x] 主控台使用 useFocusEffect 在返回時重新檢查連線狀態
+
+## 第七輪需求（固定伺服器 + 修復生成 + LOGO 放大）
+- [x] 移除設定頁面的 Voicebox URL 輸入功能（用戶不可修改）
+- [x] voice-service.ts 改為透過後端伺服器 REST API 呼叫 Voicebox（不暴露伺服器位址）
+- [x] 後端加入 Voicebox REST 端點（health/upload/generate）
+- [x] 修復語音生成功能使其能實際產出音檔
+- [x] 放大啟動動畫 LOGO（80→120）
