@@ -83,3 +83,10 @@
 - [x] 生成失敗時顯示具體錯誤原因（連線失敗/逾時/Profile 建立失敗）
 - [x] REST API 函數改為拋出具體錯誤而非靜默返回 null
 - [x] Voicebox health check timeout 從 3 秒增加到 10 秒
+
+## 第十一輪需求（修復 Voicebox API 流程 + 鍵盤避開 + 預設淺色）
+- [x] 後端 voicebox.ts 改用正確 API 流程：POST /profiles (JSON) → POST /profiles/{id}/samples (multipart) → POST /generate → 輪詢 /history/{id} → GET /audio/{id}
+- [x] 前端 voice-service.ts 對應新流程（已使用 REST API 呼叫後端）
+- [x] 加入 KeyboardAvoidingView 解決鍵盤擋住輸入框
+- [x] 預設改為淺色模式
+- [x] 端到端測試通過（upload → generate → 取得音檔 348KB, 5.44s）
