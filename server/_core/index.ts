@@ -98,10 +98,14 @@ async function startServer() {
 
   app.post("/api/voicebox/generate", async (req, res) => {
     try {
-      const { text, profileId, speed } = req.body as {
+      const { text, profileId, speed, language, instruct, engine, seed } = req.body as {
         text: string;
         profileId: string;
         speed?: number;
+        language?: string;
+        instruct?: string;
+        engine?: string;
+        seed?: number;
       };
       if (!text || !profileId) {
         res.status(400).json({ success: false, error: "缺少必要參數 text 或 profileId" });
@@ -111,6 +115,10 @@ async function startServer() {
         text,
         profile_id: profileId,
         ...(speed !== undefined && { speed }),
+        ...(language && { language }),
+        ...(instruct && { instruct }),
+        ...(engine && { engine }),
+        ...(seed !== undefined && { seed }),
       });
       if ("error" in result) {
         res.status(502).json({ success: false, error: result.error, details: result.details });

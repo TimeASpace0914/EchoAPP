@@ -34,6 +34,14 @@ export interface VoiceGenerationParams {
   audioFileName?: string;
   /** 生成進度回調（0-100） */
   onProgress?: (progress: number, stage: string) => void;
+  /** 語言（zh/en/ja...），預設 zh */
+  language?: string;
+  /** 個性指令（Voicebox instruct 參數，用於控制語氣/情感） */
+  instruct?: string;
+  /** 引擎選擇（qwen/f5等，可選） */
+  engine?: string;
+  /** 隨機種子（固定種子可重現相同結果） */
+  seed?: number;
 }
 
 export interface VoiceGenerationResult {
@@ -274,6 +282,7 @@ async function restUploadProfile(
 async function restGenerateSpeech(
   text: string,
   profileId: string,
+  options?: { language?: string; instruct?: string; engine?: string; seed?: number },
 ): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null }> {
   const apiBase = getApiBaseUrl();
   let response: Response;
@@ -283,7 +292,14 @@ async function restGenerateSpeech(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text, profileId }),
+      body: JSON.stringify({
+        text,
+        profileId,
+        ...(options?.language && { language: options.language }),
+        ...(options?.instruct && { instruct: options.instruct }),
+        ...(options?.engine && { engine: options.engine }),
+        ...(options?.seed !== undefined && { seed: options.seed }),
+      }),
       signal: createTimeoutSignal(600000),
     });
   } catch (err) {
@@ -418,7 +434,12 @@ export async function generateSpeech(
 
   if (onProgress) onProgress(55, "正在生成語音，請稍候...");
 
-  const result = await restGenerateSpeech(params.text, voiceProfileId);
+  const result = await restGenerateSpeech(params.text, voiceProfileId, {
+    language: params.language,
+    instruct: params.instruct,
+    engine: params.engine,
+    seed: params.seed,
+  });
 
   if (!result) {
     if (onProgress) onProgress(100, "生成失敗");

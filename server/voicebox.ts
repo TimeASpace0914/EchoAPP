@@ -292,7 +292,7 @@ export async function uploadVoiceProfile(
  * 3. GET /audio/{generation_id} → 取得音檔 binary → 轉 base64
  */
 export async function generateVoiceboxSpeech(
-  request: { text: string; profile_id: string; speed?: number },
+  request: { text: string; profile_id: string; speed?: number; language?: string; instruct?: string; engine?: string; seed?: number },
 ): Promise<{ audio: string; duration: number | null; generationId: string } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
 
@@ -305,7 +305,11 @@ export async function generateVoiceboxSpeech(
       body: JSON.stringify({
         text: request.text,
         profile_id: request.profile_id,
+        language: request.language || "zh",
         ...(request.speed !== undefined && { speed: request.speed }),
+        ...(request.instruct && { instruct: request.instruct }),
+        ...(request.engine && { engine: request.engine }),
+        ...(request.seed !== undefined && { seed: request.seed }),
       }),
     }, 120000, 3);
 
@@ -328,8 +332,8 @@ export async function generateVoiceboxSpeech(
     };
   }
 
-  // 步驟 2：輪詢生成狀態（最多等待 5 分鐘）
-  const maxPolls = 60;
+  // 步驟 2：輪詢生成狀態（最多等待 10 分鐘）
+  const maxPolls = 120;
   const pollInterval = 5000;
   let finalStatus: string = "generating";
   let duration: number | null = null;
@@ -372,7 +376,7 @@ export async function generateVoiceboxSpeech(
 
   if (finalStatus !== "completed") {
     return {
-      error: "語音生成逾時（超過 5 分鐘）",
+      error: "語音生成逾時（超過 10 分鐘）",
       code: "GENERATION_FAILED",
       details: "生成狀態持續為 generating，請稍後再試或縮短文字",
     };

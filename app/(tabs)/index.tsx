@@ -48,6 +48,8 @@ export default function HomeScreen() {
   const [genStage, setGenStage] = useState("");
   const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [personality, setPersonality] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // 檢查 Voicebox 連線狀態（非阻塞，不影響 APP 啟動）
   useEffect(() => {
@@ -173,6 +175,8 @@ export default function HomeScreen() {
         text: text.trim(),
         audioMimeType: audioMimeType || undefined,
         audioFileName: audioName || undefined,
+        language: "zh",
+        instruct: personality.trim() || undefined,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -215,7 +219,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType]);
+  }, [audioUri, text, audioName, audioMimeType, personality]);
 
   const formatHint = "支援 MP3、WAV、M4A、AAC 等常見音檔格式";
 
@@ -393,6 +397,55 @@ export default function HomeScreen() {
           <Text style={[styles.charCounter, { color: colors.muted }]}>
             {text.length}/{MAX_TEXT_LENGTH}
           </Text>
+        </View>
+
+        {/* 個性設定（可選） */}
+        <View style={[styles.personalityCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+          <TouchableOpacity
+            onPress={() => setShowAdvanced(!showAdvanced)}
+            style={styles.personalityHeader}
+          >
+            <View style={styles.personalityHeaderLeft}>
+              <IconSymbol name="info.circle" size={18} color={colors.primary} />
+              <Text style={[styles.personalityTitle, { color: colors.foreground }]}>
+                語氣與個性設定
+              </Text>
+            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={16}
+              color={colors.muted}
+              style={showAdvanced ? { transform: [{ rotate: "90deg" }] } : undefined}
+            />
+          </TouchableOpacity>
+          {showAdvanced && (
+            <View style={styles.personalityBody}>
+              <Text style={[styles.personalityHint, { color: colors.muted }]}>
+                描述希望親友說話時的語氣與情感，例如「溫柔、關心、帶點微笑」
+              </Text>
+              <TextInput
+                style={[
+                  styles.personalityInput,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  },
+                ]}
+                value={personality}
+                onChangeText={setPersonality}
+                placeholder="例如：溫柔、緩慢、像在跟家人聊天"
+                placeholderTextColor={colors.muted}
+                multiline
+                maxLength={100}
+                returnKeyType="done"
+                textAlignVertical="top"
+              />
+              <Text style={[styles.personalityCounter, { color: colors.muted }]}>
+                {personality.length}/100（可選）
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* 生成按鈕 / 生成進度 / 錯誤提示 */}
@@ -664,6 +717,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "right",
     marginTop: 8,
+  },
+  personalityCard: {
+    borderRadius: 20,
+    padding: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  personalityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  personalityHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  personalityTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  personalityBody: {
+    marginTop: 12,
+    gap: 8,
+  },
+  personalityHint: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  personalityInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    minHeight: 60,
+    lineHeight: 20,
+  },
+  personalityCounter: {
+    fontSize: 11,
+    textAlign: "right",
   },
   generateButton: {
     borderRadius: 20,

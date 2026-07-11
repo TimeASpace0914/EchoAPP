@@ -133,3 +133,15 @@
 - [x] 後端音檔下載加入格式驗證與診斷 log（content-type + header hex）
 - [x] 後端音檔大小驗證（< 100 bytes 視為損壞）
 - [x] 直撥 Voicebox API 端到端測試通過（兩次生成均正常，RMS > 5000）
+
+## 第十七輪需求（個性設定 + timeout 修復 + 語言參數）
+- [x] 後端 generateVoiceboxSpeech 加入 language/instruct/engine/seed 參數支援
+- [x] 後端 REST generate 端點接收 language/instruct/engine/seed 並轉發
+- [x] 前端 VoiceGenerationParams 型別加入 language/instruct/engine/seed
+- [x] 前端 restGenerateSpeech 傳遞 language/instruct/engine/seed 到後端
+- [x] 前端 generateSpeech 傳遞 params.language/instruct/engine/seed
+- [x] 手機端加入「語氣與個性設定」可摺疊 UI（TextInput 最多 100 字）
+- [x] 預設 language=zh，instruct=用戶輸入的個性描述
+- [x] 後端輪詢 maxPolls 從 60 增加到 120（最長等待 10 分鐘）
+- [x] 後端輪詢逾時錯誤訊息更新為「超過 10 分鐘」
+- [x] TypeScript 型別檢查通過（0 errors）
