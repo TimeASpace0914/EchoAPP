@@ -25,6 +25,34 @@ function createTimeoutSignal(ms: number): AbortSignal {
 
 const NGROK_HEADERS = { "ngrok-skip-browser-warning": "true" };
 
+/**
+ * 帶重試的 fetch（ngrok 連線不穩定時自動重試）
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+  retries: number = 2,
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: createTimeoutSignal(timeoutMs),
+      });
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`[Voicebox] fetch attempt ${attempt + 1}/${retries + 1} failed: ${lastError.message}`);
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // 1s, 2s backoff
+      }
+    }
+  }
+  throw lastError!;
+}
+
 export type VoiceboxProfile = {
   id: string;
   name: string;
@@ -50,10 +78,9 @@ function isVoiceboxError(r: unknown): r is VoiceboxError {
 export async function getVoiceboxProfiles(): Promise<VoiceboxProfile[] | VoiceboxError> {
   try {
     const baseUrl = getVoiceboxUrl();
-    const response = await fetch(`${baseUrl}/profiles`, {
-      signal: createTimeoutSignal(10000),
+    const response = await fetchWithRetry(`${baseUrl}/profiles`, {
       headers: NGROK_HEADERS,
-    });
+    }, 15000, 1);
 
     if (!response.ok) {
       return {
@@ -91,12 +118,11 @@ export async function uploadVoiceProfile(
   // 步驟 1：建立 Profile（JSON）
   let profileId: string;
   try {
-    const createRes = await fetch(`${baseUrl}/profiles`, {
+    const createRes = await fetchWithRetry(`${baseUrl}/profiles`, {
       method: "POST",
       headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
       body: JSON.stringify({ name, language: "zh", voice_type: "cloned" }),
-      signal: createTimeoutSignal(15000),
-    });
+    }, 30000, 2);
 
     if (!createRes.ok) {
       const errText = await createRes.text().catch(() => "");
@@ -167,15 +193,14 @@ export async function uploadVoiceProfile(
     
     console.log(`[Voicebox] Uploading sample: profile=${profileId}, file=${fileName}, size=${binaryData.length}bytes, mimeType=${mimeType}`);
     
-    const sampleRes = await fetch(`${baseUrl}/profiles/${profileId}/samples`, {
+    const sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
       method: "POST",
       headers: {
         ...NGROK_HEADERS,
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: multipartBody,
-      signal: createTimeoutSignal(60000),
-    });
+    }, 90000, 1);
 
     if (!sampleRes.ok) {
       const errText = await sampleRes.text().catch(() => "");
@@ -215,7 +240,7 @@ export async function generateVoiceboxSpeech(
   // 步驟 1：啟動生成
   let generationId: string;
   try {
-    const genRes = await fetch(`${baseUrl}/generate`, {
+    const genRes = await fetchWithRetry(`${baseUrl}/generate`, {
       method: "POST",
       headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -223,8 +248,7 @@ export async function generateVoiceboxSpeech(
         profile_id: request.profile_id,
         ...(request.speed !== undefined && { speed: request.speed }),
       }),
-      signal: createTimeoutSignal(30000),
-    });
+    }, 30000, 2);
 
     if (!genRes.ok) {
       const errText = await genRes.text().catch(() => "");
@@ -256,10 +280,9 @@ export async function generateVoiceboxSpeech(
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
     try {
-      const statusRes = await fetch(`${baseUrl}/history/${generationId}`, {
+      const statusRes = await fetchWithRetry(`${baseUrl}/history/${generationId}`, {
         headers: NGROK_HEADERS,
-        signal: createTimeoutSignal(10000),
-      });
+      }, 15000, 1);
 
       if (statusRes.ok) {
         const status = await statusRes.json() as {
@@ -298,10 +321,9 @@ export async function generateVoiceboxSpeech(
 
   // 步驟 3：取得音檔（binary → base64）
   try {
-    const audioRes = await fetch(`${baseUrl}/audio/${generationId}`, {
+    const audioRes = await fetchWithRetry(`${baseUrl}/audio/${generationId}`, {
       headers: NGROK_HEADERS,
-      signal: createTimeoutSignal(30000),
-    });
+    }, 30000, 2);
 
     if (!audioRes.ok) {
       const errText = await audioRes.text().catch(() => "");
@@ -340,10 +362,9 @@ export async function checkVoiceboxHealth(): Promise<{
 }> {
   const url = getVoiceboxUrl();
   try {
-    const response = await fetch(`${url}/profiles`, {
-      signal: createTimeoutSignal(10000),
+    const response = await fetchWithRetry(`${url}/profiles`, {
       headers: NGROK_HEADERS,
-    });
+    }, 15000, 1);
 
     if (response.ok) {
       const profiles = await response.json() as VoiceboxProfile[];

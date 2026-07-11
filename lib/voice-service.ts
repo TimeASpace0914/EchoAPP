@@ -236,11 +236,11 @@ async function restUploadProfile(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ name, audioBase64, mimeType }),
-      signal: createTimeoutSignal(60000),
+      signal: createTimeoutSignal(120000),
     });
   } catch (err) {
     throw new Error(
-      err instanceof Error && err.name === "TimeoutError"
+      err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
         ? "上傳音檔逾時，請確認網路連線正常後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
@@ -284,12 +284,12 @@ async function restGenerateSpeech(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ text, profileId }),
-      signal: createTimeoutSignal(180000),
+      signal: createTimeoutSignal(300000),
     });
   } catch (err) {
     throw new Error(
-      err instanceof Error && err.name === "TimeoutError"
-        ? "語音生成逾時（超過 3 分鐘），請縮短文字後再試。"
+      err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
+        ? "語音生成逾時（超過 5 分鐘），請縮短文字後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
   }
@@ -332,7 +332,7 @@ export async function checkVoiceboxStatus(): Promise<{
   try {
     const apiBase = getApiBaseUrl();
     const response = await fetch(`${apiBase}/api/voicebox/health`, {
-      signal: createTimeoutSignal(4000),
+      signal: createTimeoutSignal(8000),
     });
 
     if (!response.ok) return { online: false };

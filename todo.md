@@ -106,3 +106,14 @@
 - [x] validateAudioFile 移除影片格式接受邏輯（只接受音檔）
 - [x] 端到端後端測試通過（WAV 上傳 → 生成 → 取得音檔成功）
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第十四輪需求（修復 ngrok 連線不穩 + 格式提示溢出）
+- [x] 後端加入 fetchWithRetry 函數（ngrok 斷線時自動重試 2 次 + backoff）
+- [x] 後端所有 Voicebox API 呼叫改用 fetchWithRetry（upload/generate/health/polling）
+- [x] 後端 timeout 延長（建立 Profile 30s、上傳音檔 90s、生成 30s、輪詢 15s、下載音檔 30s）
+- [x] 前端 restUploadProfile timeout 從 60s 增加到 120s
+- [x] 前端 restGenerateSpeech timeout 從 180s 增加到 300s
+- [x] 前端 checkVoiceboxStatus timeout 從 4s 增加到 8s
+- [x] 前端 abort 錯誤訊息改善（涵蓋 abort 而非只判斷 TimeoutError）
+- [x] 格式提示文字縮短為「支援 MP3、WAV、M4A、AAC 等常見音檔格式」
+- [x] 後端 health 端點測試通過（online: true, profileCount: 13）

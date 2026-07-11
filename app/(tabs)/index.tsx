@@ -217,7 +217,7 @@ export default function HomeScreen() {
     }
   }, [audioUri, text, audioName, audioMimeType]);
 
-  const formatHint = `支援 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")} 格式`;
+  const formatHint = "支援 MP3、WAV、M4A、AAC 等常見音檔格式";
 
   return (
     <ScreenContainer className="flex-1">
