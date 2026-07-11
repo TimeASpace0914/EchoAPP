@@ -19,6 +19,7 @@ import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { ScreenContainer } from "@/components/screen-container";
 import { Logo } from "@/components/logo";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Waveform } from "@/components/waveform";
 import { useColors } from "@/hooks/use-colors";
 import {
   generateSpeech,
@@ -45,6 +46,7 @@ export default function HomeScreen() {
   const [genProgress, setGenProgress] = useState(0);
   const [genStage, setGenStage] = useState("");
   const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
 
   // 檢查 Voicebox 連線狀態
   useEffect(() => {
@@ -70,7 +72,6 @@ export default function HomeScreen() {
         if (Platform.OS !== "web") {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
-        // 預覽播放通常較短，5秒後自動停止狀態
         setTimeout(() => setIsPreviewPlaying(false), 10000);
       }
     } catch {
@@ -151,6 +152,7 @@ export default function HomeScreen() {
     setIsGenerating(true);
     setGenProgress(0);
     setGenStage("準備中...");
+    setGenError(null);
 
     try {
       const result = await generateSpeech({
@@ -188,12 +190,15 @@ export default function HomeScreen() {
           isRealVoice: result.isRealVoice ? "1" : "0",
         },
       });
-    } catch {
-      Alert.alert("生成失敗", "語音生成過程中發生錯誤，請重試");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "語音生成過程中發生未知錯誤";
+      setGenError(errorMsg);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     } finally {
       setIsGenerating(false);
-      setGenProgress(0);
-      setGenStage("");
+      // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
   }, [audioUri, text, audioName]);
 
@@ -203,14 +208,13 @@ export default function HomeScreen() {
   return (
     <ScreenContainer className="flex-1">
       {/* 導覽列 */}
-        <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Logo height={36} />
         <View style={{ flex: 1 }} />
-        {/* Voicebox 連線狀態指示 */}
         {voiceboxOnline !== null && (
           <View style={[styles.statusDot, { backgroundColor: voiceboxOnline ? "#4CAF50" : "#FF9800" }]}>
             <Text style={styles.statusDotText}>
-              {voiceboxOnline ? "AI 已連線" : "模擬模式"}
+              {voiceboxOnline ? "AI 已連線" : "伺服器離線"}
             </Text>
           </View>
         )}
@@ -298,7 +302,6 @@ export default function HomeScreen() {
                 上傳親友生前的聲音，讓 AI 學習他的聲音特徵
               </Text>
 
-              {/* 格式提示 */}
               <View style={[styles.formatHintBox, { backgroundColor: `${colors.muted}10`, borderColor: colors.border }]}>
                 <View style={styles.formatHintRow}>
                   <IconSymbol name="info.circle" size={14} color={colors.muted} />
@@ -375,11 +378,15 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* 生成按鈕 / 生成進度 */}
+        {/* 生成按鈕 / 生成進度 / 錯誤提示 */}
         {isGenerating ? (
           <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+            {/* 音波脈動動畫 */}
+            <View style={styles.waveContainer}>
+              <Waveform active={true} color={colors.primary} height={80} barCount={32} />
+            </View>
+
             <View style={styles.generatingHeader}>
-              <ActivityIndicator size="large" color={colors.primary} />
               <View style={styles.generatingInfo}>
                 <Text style={[styles.generatingTitle, { color: colors.foreground }]}>
                   正在生成語音
@@ -389,6 +396,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
+
             {/* 進度條 */}
             <View style={[styles.genProgressBar, { backgroundColor: colors.border }]}>
               <View
@@ -401,6 +409,39 @@ export default function HomeScreen() {
             <Text style={[styles.genProgressText, { color: colors.muted }]}>
               {genProgress}%
             </Text>
+          </View>
+        ) : genError ? (
+          <View style={[styles.errorCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+            <View style={[styles.errorIconWrap, { backgroundColor: `${colors.error}15` }]}>
+              <IconSymbol name="exclamationmark.triangle" size={32} color={colors.error} />
+            </View>
+            <Text style={[styles.errorTitle, { color: colors.error }]}>
+              生成失敗
+            </Text>
+            <Text style={[styles.errorMessage, { color: colors.muted }]}>
+              {genError}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setGenError(null);
+                setGenProgress(0);
+                setGenStage("");
+                handleGenerate();
+              }}
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            >
+              <Text style={styles.retryButtonText}>重試</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setGenError(null);
+                setGenProgress(0);
+                setGenStage("");
+              }}
+              style={[styles.dismissButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.dismissButtonText, { color: colors.muted }]}>關閉</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity
@@ -625,20 +666,24 @@ const styles = StyleSheet.create({
   },
   generatingCard: {
     borderRadius: 20,
-    padding: 24,
+    padding: 28,
     alignItems: "center",
-    gap: 16,
+    gap: 20,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
-  generatingHeader: {
-    flexDirection: "row",
+  waveContainer: {
+    width: "100%",
     alignItems: "center",
-    gap: 16,
+    paddingVertical: 8,
+  },
+  generatingHeader: {
+    alignItems: "center",
   },
   generatingInfo: {
+    alignItems: "center",
     gap: 4,
   },
   generatingTitle: {
@@ -673,5 +718,52 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "600",
+  },
+  // 錯誤卡片樣式
+  errorCard: {
+    borderRadius: 20,
+    padding: 28,
+    alignItems: "center",
+    gap: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  errorIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  errorMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  retryButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  dismissButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  dismissButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

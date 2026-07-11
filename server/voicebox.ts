@@ -217,7 +217,7 @@ export async function checkVoiceboxHealth(): Promise<{
   const url = getVoiceboxUrl();
   try {
     const response = await fetch(`${url}/profiles`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(10000),
       headers: {
         "ngrok-skip-browser-warning": "true",
       },

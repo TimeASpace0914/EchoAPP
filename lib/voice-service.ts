@@ -215,40 +215,45 @@ async function restUploadProfile(
   name: string,
   audioBase64: string,
   mimeType: string,
-): Promise<{ profileId: string; name: string } | null> {
+): Promise<{ profileId: string; name: string }> {
+  const apiBase = getApiBaseUrl();
+  let response: Response;
   try {
-    const apiBase = getApiBaseUrl();
-    const response = await fetch(`${apiBase}/api/voicebox/upload`, {
+    response = await fetch(`${apiBase}/api/voicebox/upload`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ name, audioBase64, mimeType }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     });
-
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      console.error("[voice] upload failed:", response.status, errBody);
-      return null;
-    }
-
-    const data = await response.json() as {
-      success?: boolean;
-      profileId?: string;
-      name?: string;
-      error?: string;
-    };
-
-    if (data.success && data.profileId) {
-      return { profileId: data.profileId, name: data.name || name };
-    }
-    console.error("[voice] upload returned no profileId:", data);
-    return null;
   } catch (err) {
-    console.error("[voice] upload error:", err);
-    return null;
+    throw new Error(
+      err instanceof Error && err.name === "TimeoutError"
+        ? "上傳音檔逾時，請確認網路連線正常後再試。"
+        : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
+    );
   }
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    const msg = errBody.error || `伺服器回應錯誤 (HTTP ${response.status})`;
+    throw new Error(`聲音檔案建立失敗：${msg}`);
+  }
+
+  const data = await response.json() as {
+    success?: boolean;
+    profileId?: string;
+    name?: string;
+    error?: string;
+  };
+
+  if (data.success && data.profileId) {
+    return { profileId: data.profileId, name: data.name || name };
+  }
+  throw new Error(
+    data.error || "伺服器未返回聲音檔案 ID，請確認 Voicebox 伺服器正常運作。"
+  );
 }
 
 /**
@@ -257,45 +262,50 @@ async function restUploadProfile(
 async function restGenerateSpeech(
   text: string,
   profileId: string,
-): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null } | null> {
+): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null }> {
+  const apiBase = getApiBaseUrl();
+  let response: Response;
   try {
-    const apiBase = getApiBaseUrl();
-    const response = await fetch(`${apiBase}/api/voicebox/generate`, {
+    response = await fetch(`${apiBase}/api/voicebox/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ text, profileId }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(180000),
     });
-
-    if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      console.error("[voice] generate failed:", response.status, errBody);
-      return null;
-    }
-
-    const data = await response.json() as {
-      success?: boolean;
-      audioBase64?: string;
-      duration?: number;
-      storageUrl?: string;
-      error?: string;
-    };
-
-    if (data.success && data.audioBase64) {
-      return {
-        audioBase64: data.audioBase64,
-        duration: data.duration ?? null,
-        storageUrl: data.storageUrl ?? null,
-      };
-    }
-    console.error("[voice] generate returned no audio:", data);
-    return null;
   } catch (err) {
-    console.error("[voice] generate error:", err);
-    return null;
+    throw new Error(
+      err instanceof Error && err.name === "TimeoutError"
+        ? "語音生成逾時（超過 3 分鐘），請縮短文字後再試。"
+        : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
+    );
   }
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    const msg = errBody.error || `伺服器回應錯誤 (HTTP ${response.status})`;
+    throw new Error(`語音生成失敗：${msg}`);
+  }
+
+  const data = await response.json() as {
+    success?: boolean;
+    audioBase64?: string;
+    duration?: number;
+    storageUrl?: string;
+    error?: string;
+  };
+
+  if (data.success && data.audioBase64) {
+    return {
+      audioBase64: data.audioBase64,
+      duration: data.duration ?? null,
+      storageUrl: data.storageUrl ?? null,
+    };
+  }
+  throw new Error(
+    data.error || "伺服器未返回音檔，請確認 Voicebox 伺服器正常運作。"
+  );
 }
 
 /**
@@ -376,10 +386,11 @@ export async function generateSpeech(
         throw new Error("無法建立聲音檔案，請確認語音克隆伺服器正常運作後再試。");
       }
     } catch (err) {
-      if (err instanceof Error && err.message.includes("無法建立")) {
+      // 如果已經是具體錯誤訊息，直接往上拋
+      if (err instanceof Error && err.message.length > 10) {
         throw err;
       }
-      throw new Error("讀取或上傳音檔時發生錯誤，請重試。");
+      throw new Error(`讀取或上傳音檔時發生錯誤：${err instanceof Error ? err.message : "未知錯誤"}`);
     }
   }
 
@@ -393,7 +404,7 @@ export async function generateSpeech(
 
   if (!result) {
     if (onProgress) onProgress(100, "生成失敗");
-    throw new Error("語音生成失敗，請確認 Voicebox 伺服器正常運作後再試。");
+    throw new Error("語音生成失敗：伺服器未返回音檔資料。");
   }
 
   // 階段 3：儲存音檔

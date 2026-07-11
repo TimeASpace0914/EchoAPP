@@ -33,6 +33,7 @@ const MAPPING = {
   "gear": "settings",
   "waveform": "graphic-eq",
   "cloud.up.fill": "cloud-upload",
+  "cloud.fill": "cloud",
   "person.fill": "person",
   "heart.fill": "favorite",
   "trash": "delete",
