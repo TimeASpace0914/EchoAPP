@@ -270,7 +270,7 @@ export default function HomeScreen() {
               )}
 
               {/* 預覽播放區 */}
-              <View style={[styles.previewBox, { backgroundColor: "#F5F5F5", borderColor: colors.border }]}>
+              <View style={[styles.previewBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <TouchableOpacity
                   onPress={togglePreview}
                   style={[styles.previewPlayButton, { backgroundColor: colors.primary }]}
@@ -372,7 +372,7 @@ export default function HomeScreen() {
             style={[
               styles.textInput,
               {
-                backgroundColor: "#F5F5F5",
+                backgroundColor: colors.background,
                 borderColor: colors.border,
                 color: colors.foreground,
               },
@@ -380,7 +380,7 @@ export default function HomeScreen() {
             value={text}
             onChangeText={(val) => setText(val.slice(0, MAX_TEXT_LENGTH))}
             placeholder="例如：最近在幹嘛呀？有沒有好好吃飯！"
-            placeholderTextColor="#BBBBBB"
+            placeholderTextColor={colors.muted}
             multiline
             maxLength={MAX_TEXT_LENGTH}
             returnKeyType="done"

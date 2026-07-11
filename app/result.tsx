@@ -484,11 +484,11 @@ export default function ResultScreen() {
               取一個有意義的名稱，方便日後在回憶庫中找到它
             </Text>
             <TextInput
-              style={[styles.modalInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
               value={titleInput}
               onChangeText={setTitleInput}
               placeholder="例如：爸爸的生日祝福"
-              placeholderTextColor="#BBBBBB"
+              placeholderTextColor={colors.muted}
               maxLength={30}
               autoFocus
               returnKeyType="done"
@@ -526,11 +526,11 @@ export default function ResultScreen() {
               用標籤分類，例如：生日、節日、叮嚀
             </Text>
             <TextInput
-              style={[styles.modalInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
               value={tagInput}
               onChangeText={setTagInput}
               placeholder="輸入標籤名稱"
-              placeholderTextColor="#BBBBBB"
+              placeholderTextColor={colors.muted}
               maxLength={10}
               autoFocus
               returnKeyType="done"

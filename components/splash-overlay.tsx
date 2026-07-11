@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, StyleSheet, Dimensions } from "react-native";
+import { View, StyleSheet, Dimensions, useColorScheme } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -27,6 +27,8 @@ export function SplashOverlay({
   onAnimationComplete,
   duration = 2500,
 }: SplashOverlayProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.8);
   const progressWidth = useSharedValue(0);
@@ -87,10 +89,10 @@ export function SplashOverlay({
   }));
 
   return (
-    <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
+    <Animated.View style={[styles.overlay, { backgroundColor: isDark ? "#1E1E1E" : "#EFEFEF" }, overlayAnimatedStyle]}>
       <View style={styles.content}>
         <Animated.View style={logoAnimatedStyle}>
-          <Logo height={200} variant="black" />
+          <Logo height={200} variant={isDark ? "white" : "black"} />
         </Animated.View>
         <Animated.View
           style={[styles.progressTrack, progressAnimatedStyle]}
@@ -103,7 +105,6 @@ export function SplashOverlay({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#EFEFEF",
     zIndex: 999,
     alignItems: "center",
     justifyContent: "center",

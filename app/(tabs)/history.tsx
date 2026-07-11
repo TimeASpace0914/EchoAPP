@@ -330,7 +330,7 @@ export default function HistoryScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="搜尋名稱、標籤或內容..."
-            placeholderTextColor="#BBBBBB"
+            placeholderTextColor={colors.muted}
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
@@ -380,21 +380,21 @@ export default function HistoryScreen() {
 
             <Text style={[styles.editLabel, { color: colors.muted }]}>名稱</Text>
             <TextInput
-              style={[styles.editInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              style={[styles.editInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
               value={editTitle}
               onChangeText={setEditTitle}
               placeholder="為這段語音取個名字..."
-              placeholderTextColor="#BBBBBB"
+              placeholderTextColor={colors.muted}
               maxLength={30}
             />
 
             <Text style={[styles.editLabel, { color: colors.muted }]}>標籤（以頓號分隔）</Text>
             <TextInput
-              style={[styles.editInput, { backgroundColor: "#F5F5F5", borderColor: colors.border, color: colors.foreground }]}
+              style={[styles.editInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
               value={editTags}
               onChangeText={setEditTags}
               placeholder="例如：生日、叮嚀、祝福"
-              placeholderTextColor="#BBBBBB"
+              placeholderTextColor={colors.muted}
               maxLength={50}
             />
 

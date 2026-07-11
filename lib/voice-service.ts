@@ -10,6 +10,17 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
 
+/**
+ * 建立帶超時的 AbortSignal（相容舊版裝置不支援 AbortSignal.timeout）
+ */
+function createTimeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  // 清理 timer 避免記憶體洩漏
+  controller.signal.addEventListener("abort", () => clearTimeout(timer));
+  return controller.signal;
+}
+
 export interface VoiceGenerationParams {
   /** 參考音檔 URI（親友生前音檔） */
   referenceAudioUri: string;
@@ -225,7 +236,7 @@ async function restUploadProfile(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ name, audioBase64, mimeType }),
-      signal: AbortSignal.timeout(60000),
+      signal: createTimeoutSignal(60000),
     });
   } catch (err) {
     throw new Error(
@@ -272,7 +283,7 @@ async function restGenerateSpeech(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ text, profileId }),
-      signal: AbortSignal.timeout(180000),
+      signal: createTimeoutSignal(180000),
     });
   } catch (err) {
     throw new Error(
@@ -319,7 +330,7 @@ export async function checkVoiceboxStatus(): Promise<{
   try {
     const apiBase = getApiBaseUrl();
     const response = await fetch(`${apiBase}/api/voicebox/health`, {
-      signal: AbortSignal.timeout(4000),
+      signal: createTimeoutSignal(4000),
     });
 
     if (!response.ok) return { online: false };
