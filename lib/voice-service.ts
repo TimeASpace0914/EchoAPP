@@ -319,7 +319,7 @@ export async function checkVoiceboxStatus(): Promise<{
   try {
     const apiBase = getApiBaseUrl();
     const response = await fetch(`${apiBase}/api/voicebox/health`, {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
 
     if (!response.ok) return { online: false };

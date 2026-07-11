@@ -129,6 +129,7 @@ export default function HistoryScreen() {
         duration: entry.duration.toString(),
         createdAt: entry.createdAt.toString(),
         entryId: entry.id,
+        isRealVoice: entry.isRealVoice ? "1" : "0",
       },
     });
   };

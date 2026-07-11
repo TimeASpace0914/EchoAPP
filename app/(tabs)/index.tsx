@@ -48,11 +48,24 @@ export default function HomeScreen() {
   const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
 
-  // 檢查 Voicebox 連線狀態
+  // 檢查 Voicebox 連線狀態（非阻塞，不影響 APP 啟動）
   useEffect(() => {
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) setVoiceboxOnline(false);
+    }, 5000); // 最多等 5 秒，超時直接設為離線
     checkVoiceboxStatus().then((status) => {
-      setVoiceboxOnline(status.online);
-    }).catch(() => setVoiceboxOnline(false));
+      if (!cancelled) {
+        clearTimeout(timeout);
+        setVoiceboxOnline(status.online);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        clearTimeout(timeout);
+        setVoiceboxOnline(false);
+      }
+    });
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, []);
 
   const previewPlayer = useAudioPlayer(audioUri ? { uri: audioUri } : null);
