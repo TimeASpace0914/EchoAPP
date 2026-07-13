@@ -50,6 +50,7 @@ export default function HomeScreen() {
   const [genError, setGenError] = useState<string | null>(null);
   const [personality, setPersonality] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [genElapsed, setGenElapsed] = useState(0);
 
   // 檢查 Voicebox 連線狀態（非阻塞，不影響 APP 啟動）
   useEffect(() => {
@@ -168,6 +169,7 @@ export default function HomeScreen() {
     setGenProgress(0);
     setGenStage("準備中...");
     setGenError(null);
+    setGenElapsed(0);
 
     try {
       const result = await generateSpeech({
@@ -221,7 +223,26 @@ export default function HomeScreen() {
     }
   }, [audioUri, text, audioName, audioMimeType, personality]);
 
+  // 生成計時器
+  useEffect(() => {
+    if (!isGenerating) return;
+    const timer = setInterval(() => {
+      setGenElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isGenerating]);
+
   const formatHint = "支援 MP3、WAV、M4A、AAC 等常見音檔格式";
+
+  const EMOTION_PRESETS = [
+    "溫柔", "開心", "平靜", "關心", "緩慢", "慈祥", "思念", "鼓勵",
+  ];
+
+  const formatElapsed = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}:${sec.toString().padStart(2, "0")}` : `${sec}秒`;
+  };
 
   return (
     <ScreenContainer className="flex-1">
@@ -421,8 +442,45 @@ export default function HomeScreen() {
           {showAdvanced && (
             <View style={styles.personalityBody}>
               <Text style={[styles.personalityHint, { color: colors.muted }]}>
-                描述希望親友說話時的語氣與情感，例如「溫柔、關心、帶點微笑」
+                描述希望親友說話時的語氣與情感，或點選下方標籤快速帶入
               </Text>
+              {/* 預設情緒標籤 */}
+              <View style={styles.emotionTagsRow}>
+                {EMOTION_PRESETS.map((tag) => {
+                  const isSelected = personality.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => {
+                        if (isSelected) {
+                          setPersonality(prev => prev.replace(new RegExp(tag + "[、，,\\s]*", "g"), "").trim());
+                        } else {
+                          setPersonality(prev => {
+                            const next = prev ? `${prev}、${tag}` : tag;
+                            return next.slice(0, 100);
+                          });
+                        }
+                      }}
+                      style={[
+                        styles.emotionTag,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.background,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.emotionTagText,
+                          { color: isSelected ? "#FFFFFF" : colors.foreground },
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
               <TextInput
                 style={[
                   styles.personalityInput,
@@ -451,9 +509,12 @@ export default function HomeScreen() {
         {/* 生成按鈕 / 生成進度 / 錯誤提示 */}
         {isGenerating ? (
           <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-            {/* 音波脈動動畫 */}
-            <View style={styles.waveContainer}>
-              <Waveform active={true} color={colors.primary} height={80} barCount={32} />
+            {/* 旋轉載入 + 音波脈動 */}
+            <View style={styles.generatingAnimRow}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <View style={styles.waveContainerSmall}>
+                <Waveform active={true} color={colors.primary} height={40} barCount={20} />
+              </View>
             </View>
 
             <View style={styles.generatingHeader}>
@@ -463,6 +524,12 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[styles.generatingStage, { color: colors.muted }]}>
                   {genStage}
+                </Text>
+              </View>
+              {/* 計時器 */}
+              <View style={styles.genTimerWrap}>
+                <Text style={[styles.genTimerText, { color: colors.muted }]}>
+                  {formatElapsed(genElapsed)}
                 </Text>
               </View>
             </View>
@@ -476,9 +543,14 @@ export default function HomeScreen() {
                 ]}
               />
             </View>
-            <Text style={[styles.genProgressText, { color: colors.muted }]}>
-              {genProgress}%
-            </Text>
+            <View style={styles.genProgressInfoRow}>
+              <Text style={[styles.genProgressText, { color: colors.muted }]}>
+                {genProgress}%
+              </Text>
+              <Text style={[styles.genProgressHint, { color: colors.muted }]}>
+                語音生成約需 1-3 分鐘，請耐心等待
+              </Text>
+            </View>
           </View>
         ) : genError ? (
           <View style={[styles.errorCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -775,6 +847,51 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "700",
+  },
+  generatingAnimRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  waveContainerSmall: {
+    flex: 1,
+    alignItems: "center",
+  },
+  genTimerWrap: {
+    backgroundColor: "rgba(0,0,0,0.05)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  genTimerText: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  genProgressInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  genProgressHint: {
+    fontSize: 11,
+  },
+  emotionTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  emotionTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  emotionTagText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
   generatingContent: {
     flexDirection: "row",

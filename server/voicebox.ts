@@ -33,12 +33,15 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
     fs.writeFileSync(inputPath, inputBuffer);
 
     // 使用 ffmpeg 轉換為標準 WAV 格式
-    // 保留原始採樣率和聲道數，只轉容器格式，避免品質損失
+    // 1. 裁剪開頭靜音（避免 Voicebox 把靜音當成語音特徵，產生前導雜訊）
+    // 2. 音量標準化（loudnorm 確保音量一致）
+    // 3. 保留原始採樣率和聲道數
     await execFileAsync("ffmpeg", [
-      "-y",               // 覆寫輸出
-      "-i", inputPath,     // 輸入
-      "-c:a", "pcm_s16le",  // 音頻編碼：16-bit PCM little-endian
-      "-f", "wav",          // 輸出格式
+      "-y",                   // 覆寫輸出
+      "-i", inputPath,         // 輸入
+      "-af", "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,afftdn=nr=10,loudnorm=I=-16:LRA=11:TP=-1.5",  // 裁剪開頭靜音 + 降噪 + 音量標準化
+      "-c:a", "pcm_s16le",    // 音頻編碼：16-bit PCM little-endian
+      "-f", "wav",            // 輸出格式
       outputPath,
     ], { timeout: 30000 });
 
@@ -237,11 +240,11 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // reference_text part
+    // reference_text part — 提供更精確的描述幫助 Voicebox 學習
     const textPart = Buffer.from(
       `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
-      `參考音檔\r\n`
+      `這是一段親友生前的語音錄音\r\n`
     );
     
     // ending boundary
@@ -424,7 +427,35 @@ export async function generateVoiceboxSpeech(
       // 不阻擋，但記錄警告 — Voicebox 可能回傳非標準格式
     }
     
-    const audioBase64 = audioBytes.toString("base64");
+    // 對生成的音檔進行後處理：裁剪開頭靜音/雜訊
+    let processedAudio = audioBytes;
+    try {
+      const tmpIn = path.join(os.tmpdir(), `vb_gen_in_${Date.now()}.wav`);
+      const tmpOut = path.join(os.tmpdir(), `vb_gen_out_${Date.now()}.wav`);
+      fs.writeFileSync(tmpIn, audioBytes);
+      
+      // 裁剪開頭 0.3 秒的靜音/雜訊，並輕微降噪
+      await execFileAsync("ffmpeg", [
+        "-y",
+        "-i", tmpIn,
+        "-af", "silenceremove=start_periods=1:start_silence=0:start_threshold=-40dB,afftdn=nr=5",
+        "-c:a", "pcm_s16le",
+        "-f", "wav",
+        tmpOut,
+      ], { timeout: 15000 });
+      
+      const cleaned = fs.readFileSync(tmpOut);
+      if (cleaned.length > 100) {
+        console.log(`[Voicebox] Post-processed audio: ${audioBytes.length}bytes → ${cleaned.length}bytes (silence trimmed)`, );
+        processedAudio = cleaned;
+      }
+      try { fs.unlinkSync(tmpIn); } catch {}
+      try { fs.unlinkSync(tmpOut); } catch {}
+    } catch (postErr) {
+      console.warn(`[Voicebox] Post-processing failed, using raw audio:`, postErr instanceof Error ? postErr.message : postErr);
+    }
+
+    const audioBase64 = processedAudio.toString("base64");
 
     return {
       audio: audioBase64,

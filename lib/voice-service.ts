@@ -390,7 +390,6 @@ export async function generateSpeech(
 
   // 階段 1：讀取參考音檔
   if (onProgress) onProgress(5, "正在讀取參考音檔...");
-  await new Promise((resolve) => setTimeout(resolve, 200));
 
   let voiceProfileId = params.voiceProfileId;
 
@@ -430,9 +429,8 @@ export async function generateSpeech(
 
   // 階段 2：生成語音
   if (onProgress) onProgress(40, "AI 正在學習聲音特徵...");
-  await new Promise((resolve) => setTimeout(resolve, 400));
 
-  if (onProgress) onProgress(55, "正在生成語音，請稍候...");
+  if (onProgress) onProgress(50, "正在生成語音，請耐心等待...");
 
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
@@ -448,7 +446,6 @@ export async function generateSpeech(
 
   // 階段 3：儲存音檔
   if (onProgress) onProgress(85, "正在處理音質優化...");
-  await new Promise((resolve) => setTimeout(resolve, 300));
 
   if (onProgress) onProgress(92, "正在儲存音檔...");
 

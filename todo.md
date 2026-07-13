@@ -107,7 +107,7 @@
 - [x] 端到端後端測試通過（WAV 上傳 → 生成 → 取得音檔成功）
 - [x] TypeScript 型別檢查通過（0 errors）
 
-## 第十五輪需求（修復 ngrok 連線不穩 + 格式提示溢出）
+## 第十七輪需求（修復 ngrok 連線不穩 + 格式提示溢出）
 - [x] 後端加入 fetchWithRetry 函數（ngrok 斷線時自動重試 2 次 + backoff）
 - [x] 後端所有 Voicebox API 呼叫改用 fetchWithRetry（upload/generate/health/polling）
 - [x] 後端 timeout 延長（建立 Profile 30s、上傳音檔 90s、生成 30s、輪詢 15s、下載音檔 30s）
@@ -144,4 +144,16 @@
 - [x] 預設 language=zh，instruct=用戶輸入的個性描述
 - [x] 後端輪詢 maxPolls 從 60 增加到 120（最長等待 10 分鐘）
 - [x] 後端輪詢逾時錯誤訊息更新為「超過 10 分鐘」
+- [x] TypeScript 型別檢查通過（0 errors）
+
+## 第十八輪需求（UI 優化 + 音檔品質 + 流程加速）
+- [x] 生成等待動畫加入旋轉載入圖示（ActivityIndicator large）
+- [x] 生成進度卡片加入即時計時器（格式化分:秒）
+- [x] 進度卡片加入預估時間提示「語音生成約需 1-3 分鐘，請耐心等待」
+- [x] 預設情緒標籤快速帶入（溫柔/開心/平靜/關心/緩慢/慈祥/思念/鼓勵）
+- [x] 情緒標籤可點選切換（選中為主色填充，再點取消）
+- [x] 前端移除不必要 setTimeout 延遲（200ms+400ms+300ms）
+- [x] 後端 ffmpeg 加入靜音裁剪（silenceremove）+ 降噪（afftdn）+ 音量標準化（loudnorm）
+- [x] 後端生成音檔後處理：裁剪開頭雜訊 + 輕微降噪
+- [x] 後端 reference_text 改為更精確描述「這是一段親友生前的語音錄音」
 - [x] TypeScript 型別檢查通過（0 errors）
