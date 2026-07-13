@@ -244,48 +244,14 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // reference_text part — 使用 Whisper 自動轉錄參考音檔的實際語音內容
-    // 這是關鍵：Voicebox 需要知道參考音檔中「說了什麼」才能正確克隆語音
+    // reference_text — 若用戶已提供則直接使用，否則使用通用 fallback
+    // Whisper 轉錄已改為非阻塞：先使用通用 reference_text 快速上傳，不等待轉錄完成
+    // Voicebox 會自行分析音檔特徵，reference_text 僅為輔助參考
     let actualReferenceText = referenceText;
     
     if (!actualReferenceText) {
-      // 自動轉錄參考音檔
-      try {
-        console.log('[Voicebox] Auto-transcribing reference audio via Whisper...');
-        const { transcribeAudio } = await import('./_core/voiceTranscription');
-        const { storagePut, storageGetSignedUrl } = await import('./storage');
-        
-        // 先上傳音檔到 storage，再取得完整的 S3 簽名 URL 供 Whisper 下載
-        const tempBuffer = Buffer.from(audioBase64, 'base64');
-        const { key: storageKey } = await storagePut(`temp-transcribe/${Date.now()}.wav`, tempBuffer, 'audio/wav');
-        const signedUrl = await storageGetSignedUrl(storageKey);
-        console.log(`[Voicebox] Whisper audio URL: ${signedUrl.substring(0, 80)}...`);
-        
-        const transcriptResult = await transcribeAudio({
-          audioUrl: signedUrl,
-          language: 'zh',
-        });
-        
-        if ('text' in transcriptResult && transcriptResult.text) {
-          const transcript = transcriptResult.text.trim();
-          // 驗證轉錄品質：必須包含 CJK 字元（中文/日文/韓文）才算有效
-          // 純英文短字串（如 "by bwd6"）是 Whisper 對無語音內容的幻覺，不應使用
-          const hasCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/.test(transcript);
-          if (hasCJK && transcript.length >= 2) {
-            actualReferenceText = transcript;
-            console.log(`[Voicebox] Transcription result: "${actualReferenceText}"`);
-          } else {
-            console.log(`[Voicebox] Transcription lacks CJK characters: "${transcript}", using generic fallback`);
-            actualReferenceText = '這是一段親友生前的語音錄音';
-          }
-        } else {
-          console.log('[Voicebox] Transcription failed, using generic fallback');
-          actualReferenceText = '這是一段親友生前的語音錄音';
-        }
-      } catch (transcribeErr) {
-        console.log('[Voicebox] Transcription error:', transcribeErr instanceof Error ? transcribeErr.message : 'unknown');
-        actualReferenceText = '這是一段親友生前的語音錄音';
-      }
+      actualReferenceText = '這是一段親友生前的語音錄音';
+      console.log('[Voicebox] Using generic reference_text (skip Whisper to speed up upload)');
     }
     
     // ending boundary

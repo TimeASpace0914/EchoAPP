@@ -44,6 +44,8 @@ export interface VoiceGenerationParams {
   seed?: number;
   /** 參考音檔的轉錄文字（若已知，否則後端自動轉錄） */
   referenceText?: string;
+  /** 聲音描述（選填，用於 profile 名稱，如「爸爸的聲音」） */
+  description?: string;
 }
 
 export interface VoiceGenerationResult {
@@ -237,6 +239,8 @@ async function restUploadProfile(
   audioBase64: string,
   mimeType: string,
   referenceText?: string,
+  personality?: string,
+  description?: string,
 ): Promise<{ profileId: string; name: string }> {
   const apiBase = getApiBaseUrl();
   let response: Response;
@@ -246,7 +250,14 @@ async function restUploadProfile(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name, audioBase64, mimeType, ...(referenceText && { referenceText }) }),
+      body: JSON.stringify({
+        name,
+        audioBase64,
+        mimeType,
+        ...(referenceText && { referenceText }),
+        ...(personality && { personality }),
+        ...(description && { description }),
+      }),
       signal: createTimeoutSignal(180000),
     });
   } catch (err) {
@@ -416,7 +427,14 @@ export async function generateSpeech(
       if (onProgress) onProgress(25, "正在上傳聲音檔案至伺服器...");
 
       const profileName = `echo_${timestamp}`;
-      const uploadResult = await restUploadProfile(profileName, audioBase64, mimeType, params.referenceText);
+      const uploadResult = await restUploadProfile(
+        profileName,
+        audioBase64,
+        mimeType,
+        params.referenceText,
+        params.instruct,  // personality → Voicebox profile personality
+        params.description,  // description → Voicebox profile name (可選)
+      );
       voiceProfileId = uploadResult?.profileId ?? undefined;
 
       if (!voiceProfileId) {

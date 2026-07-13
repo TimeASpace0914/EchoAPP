@@ -49,6 +49,7 @@ export default function HomeScreen() {
   const [voiceboxOnline, setVoiceboxOnline] = useState<boolean | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const [personality, setPersonality] = useState("");
+  const [voiceDescription, setVoiceDescription] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
 
@@ -179,6 +180,7 @@ export default function HomeScreen() {
         audioFileName: audioName || undefined,
         language: "zh",
         instruct: personality.trim() || undefined,
+        description: voiceDescription.trim() || undefined,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -221,7 +223,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription]);
 
   // 生成計時器
   useEffect(() => {
@@ -321,6 +323,22 @@ export default function HomeScreen() {
                     確認音檔內容無誤後再生成
                   </Text>
                 </View>
+              </View>
+
+              {/* 聲音描述（選填） */}
+              <View style={[styles.descriptionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.descriptionLabel, { color: colors.foreground }]}>
+                  聲音描述（選填）
+                </Text>
+                <TextInput
+                  style={[styles.descriptionInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
+                  value={voiceDescription}
+                  onChangeText={(val) => setVoiceDescription(val.slice(0, 30))}
+                  placeholder="例如：爸爸的聲音"
+                  placeholderTextColor={colors.muted}
+                  maxLength={30}
+                  returnKeyType="done"
+                />
               </View>
 
               <TouchableOpacity
@@ -655,22 +673,23 @@ const styles = StyleSheet.create({
   formatHintBox: {
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 4,
     width: "100%",
+    alignSelf: "stretch",
   },
   formatHintRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap",
+    gap: 4,
+    flexShrink: 1,
   },
   formatHintText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
     flexShrink: 1,
-    flexWrap: "wrap",
+    flex: 1,
   },
   formatHintSub: {
     fontSize: 11,
@@ -757,6 +776,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   changeButtonText: {
+    fontSize: 14,
+  },
+  descriptionBox: {
+    width: "100%",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+    marginTop: 4,
+  },
+  descriptionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  descriptionInput: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     fontSize: 14,
   },
   textCard: {

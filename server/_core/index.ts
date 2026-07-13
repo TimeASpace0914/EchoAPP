@@ -76,17 +76,21 @@ async function startServer() {
 
   app.post("/api/voicebox/upload", async (req, res) => {
     try {
-      const { name, audioBase64, mimeType, referenceText } = req.body as {
+      const { name, audioBase64, mimeType, referenceText, personality, description } = req.body as {
         name: string;
         audioBase64: string;
         mimeType?: string;
         referenceText?: string;
+        personality?: string;
+        description?: string;
       };
       if (!name || !audioBase64) {
         res.status(400).json({ success: false, error: "缺少必要參數 name 或 audioBase64" });
         return;
       }
-      const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav", referenceText);
+      // 將 description 作為 profile name（若有），personality 傳給 Voicebox 作為個性設定
+      const profileName = description || name;
+      const result = await uploadVoiceProfile(profileName, audioBase64, mimeType || "audio/wav", referenceText, personality);
       if ("error" in result) {
         res.status(502).json({ success: false, error: result.error, details: result.details });
         return;

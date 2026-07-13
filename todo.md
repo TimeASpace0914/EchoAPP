@@ -181,3 +181,14 @@
 - [x] multipart 上傳邏輯重構（移除重複程式碼，使用 let sampleRes）
 - [x] TypeScript 型別檢查通過（0 errors）
 - [x] 端到端測試通過（fallback reference_text 上傳成功 + 生成成功）
+
+## 第二十一輪需求（個性設定同步 + 聲音描述欄位 + 格式提示修復 + 生成加速）
+- [x] 後端 upload 端點加入 personality 和 description 參數接收與轉發
+- [x] 前端 restUploadProfile 加入 personality 和 description 參數傳遞
+- [x] 前端 VoiceGenerationParams 介面加入 description 欄位
+- [x] 前端 generateSpeech 傳遞 instruct（personality）和 description 到 restUploadProfile
+- [x] 前端 handleGenerate 傳遞 voiceDescription 到 generateSpeech
+- [x] 新增「聲音描述」選填欄位 UI（在上傳音檔後顯示，最多 30 字）
+- [x] 修復格式提示版面：formatHintBox 加入 alignSelf stretch，formatHintRow 移除 flexWrap 改用 flexShrink，formatHintText 加入 flex:1
+- [x] 生成速度優化：移除 Whisper 轉錄阻塞流程，直接使用通用 reference_text 上傳
+- [x] TypeScript 型別檢查通過（0 errors）
