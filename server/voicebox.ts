@@ -158,16 +158,22 @@ export async function uploadVoiceProfile(
   name: string,
   audioBase64: string,
   mimeType: string = "audio/wav",
+  referenceText?: string,
+  personality?: string,
 ): Promise<{ profile_id: string; name: string } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
 
-  // 步驟 1：建立 Profile（JSON）
+  // 步驟 1：建立 Profile（JSON），若有個性設定則一同送出
   let profileId: string;
   try {
+    const profileBody: Record<string, string> = { name, language: "zh", voice_type: "cloned" };
+    if (personality) {
+      profileBody.personality = personality;
+    }
     const createRes = await fetchWithRetry(`${baseUrl}/profiles`, {
       method: "POST",
       headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
-      body: JSON.stringify({ name, language: "zh", voice_type: "cloned" }),
+      body: JSON.stringify(profileBody),
     }, 30000, 2);
 
     if (!createRes.ok) {
@@ -238,33 +244,88 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // reference_text part — 提供更精確的描述幫助 Voicebox 學習
-    const textPart = Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
-      `這是一段親友生前的語音錄音\r\n`
-    );
+    // reference_text part — 使用 Whisper 自動轉錄參考音檔的實際語音內容
+    // 這是關鍵：Voicebox 需要知道參考音檔中「說了什麼」才能正確克隆語音
+    let actualReferenceText = referenceText;
+    
+    if (!actualReferenceText) {
+      // 自動轉錄參考音檔
+      try {
+        console.log('[Voicebox] Auto-transcribing reference audio via Whisper...');
+        const { transcribeAudio } = await import('./_core/voiceTranscription');
+        const { storagePut, storageGetSignedUrl } = await import('./storage');
+        
+        // 先上傳音檔到 storage，再取得完整的 S3 簽名 URL 供 Whisper 下載
+        const tempBuffer = Buffer.from(audioBase64, 'base64');
+        const { key: storageKey } = await storagePut(`temp-transcribe/${Date.now()}.wav`, tempBuffer, 'audio/wav');
+        const signedUrl = await storageGetSignedUrl(storageKey);
+        console.log(`[Voicebox] Whisper audio URL: ${signedUrl.substring(0, 80)}...`);
+        
+        const transcriptResult = await transcribeAudio({
+          audioUrl: signedUrl,
+          language: 'zh',
+        });
+        
+        if ('text' in transcriptResult && transcriptResult.text) {
+          const transcript = transcriptResult.text.trim();
+          // 驗證轉錄品質：必須包含 CJK 字元（中文/日文/韓文）才算有效
+          // 純英文短字串（如 "by bwd6"）是 Whisper 對無語音內容的幻覺，不應使用
+          const hasCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/.test(transcript);
+          if (hasCJK && transcript.length >= 2) {
+            actualReferenceText = transcript;
+            console.log(`[Voicebox] Transcription result: "${actualReferenceText}"`);
+          } else {
+            console.log(`[Voicebox] Transcription lacks CJK characters: "${transcript}", using generic fallback`);
+            actualReferenceText = '這是一段親友生前的語音錄音';
+          }
+        } else {
+          console.log('[Voicebox] Transcription failed, using generic fallback');
+          actualReferenceText = '這是一段親友生前的語音錄音';
+        }
+      } catch (transcribeErr) {
+        console.log('[Voicebox] Transcription error:', transcribeErr instanceof Error ? transcribeErr.message : 'unknown');
+        actualReferenceText = '這是一段親友生前的語音錄音';
+      }
+    }
     
     // ending boundary
     const endBoundary = Buffer.from(`--${boundary}--\r\n`);
     
-    // 組合所有部分
-    const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
-    
-    console.log(`[Voicebox] Uploading sample: profile=${profileId}, file=${fileName}, size=${binaryData.length}bytes, mimeType=${uploadMimeType}`);
-    
-    const sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
-      method: "POST",
-      headers: {
-        ...NGROK_HEADERS,
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-      },
-      body: multipartBody,
-    }, 90000, 1);
+    // 若有有效的 reference_text 才加入，否則只送音檔
+    let sampleRes: Response;
+    if (actualReferenceText) {
+      const textPart = Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
+        `${actualReferenceText}\r\n`
+      );
+      const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
+      console.log(`[Voicebox] Uploading sample with reference_text: "${actualReferenceText.substring(0, 50)}"`);
+      sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
+        method: "POST",
+        headers: {
+          ...NGROK_HEADERS,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        },
+        body: multipartBody,
+      }, 90000, 3);
+    } else {
+      // 不送 reference_text，讓 Voicebox 自行分析音檔
+      const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, endBoundary]);
+      console.log(`[Voicebox] Uploading sample without reference_text`);
+      sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
+        method: "POST",
+        headers: {
+          ...NGROK_HEADERS,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        },
+        body: multipartBody,
+      }, 90000, 3);
+    }
 
     if (!sampleRes.ok) {
       const errText = await sampleRes.text().catch(() => "");
-      console.error(`[Voicebox] Sample upload failed: HTTP ${sampleRes.status}: ${errText}`);
+      console.error(`[Voicebox] Sample upload failed: HTTP ${sampleRes.status}: ${errText.substring(0, 200)}`);
       return {
         error: "上傳參考音檔失敗",
         code: "UPLOAD_FAILED",

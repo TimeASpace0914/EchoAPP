@@ -173,3 +173,11 @@
 - [x] generatingAnimRow 加入 width 100% 和 waveContainerSmall maxWidth 200
 - [x] personalityHeader 加入 width 100% 和 flexShrink
 - [x] 端到端測試通過（上傳 5s + 生成 103s = 總計 108s，RMS=3693.9）
+
+## 第二十輪需求（語音內容不正確修正）
+- [x] Whisper 轉錄加入 CJK 字元驗證（純英文短字串如 "by bwd6" 是幻覺，不使用）
+- [x] 無有效轉錄時使用通用 fallback「這是一段親友生前的語音錄音」
+- [x] profile 建立時加入 personality 欄位（若用戶有提供 instruct）
+- [x] multipart 上傳邏輯重構（移除重複程式碼，使用 let sampleRes）
+- [x] TypeScript 型別檢查通過（0 errors）
+- [x] 端到端測試通過（fallback reference_text 上傳成功 + 生成成功）

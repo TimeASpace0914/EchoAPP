@@ -76,16 +76,17 @@ async function startServer() {
 
   app.post("/api/voicebox/upload", async (req, res) => {
     try {
-      const { name, audioBase64, mimeType } = req.body as {
+      const { name, audioBase64, mimeType, referenceText } = req.body as {
         name: string;
         audioBase64: string;
         mimeType?: string;
+        referenceText?: string;
       };
       if (!name || !audioBase64) {
         res.status(400).json({ success: false, error: "缺少必要參數 name 或 audioBase64" });
         return;
       }
-      const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav");
+      const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav", referenceText);
       if ("error" in result) {
         res.status(502).json({ success: false, error: result.error, details: result.details });
         return;

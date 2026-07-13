@@ -42,6 +42,8 @@ export interface VoiceGenerationParams {
   engine?: string;
   /** 隨機種子（固定種子可重現相同結果） */
   seed?: number;
+  /** 參考音檔的轉錄文字（若已知，否則後端自動轉錄） */
+  referenceText?: string;
 }
 
 export interface VoiceGenerationResult {
@@ -234,6 +236,7 @@ async function restUploadProfile(
   name: string,
   audioBase64: string,
   mimeType: string,
+  referenceText?: string,
 ): Promise<{ profileId: string; name: string }> {
   const apiBase = getApiBaseUrl();
   let response: Response;
@@ -243,13 +246,13 @@ async function restUploadProfile(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name, audioBase64, mimeType }),
-      signal: createTimeoutSignal(120000),
+      body: JSON.stringify({ name, audioBase64, mimeType, ...(referenceText && { referenceText }) }),
+      signal: createTimeoutSignal(180000),
     });
   } catch (err) {
     throw new Error(
       err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
-        ? "上傳音檔逾時，請確認網路連線正常後再試。"
+        ? "上傳音檔逾時（超過 3 分鐘），請確認網路連線正常後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
   }
@@ -395,7 +398,8 @@ export async function generateSpeech(
 
   // 若沒有 profile ID，先上傳音檔建立 profile
   if (!voiceProfileId) {
-    if (onProgress) onProgress(15, "正在分析聲音特徵...");
+    if (onProgress) onProgress(10, "正在分析參考音檔內容...");
+    if (onProgress) onProgress(15, "正在轉錄語音內容...");
     try {
       // 使用 picker 提供的真實 mimeType，否則從副檔名推導
       const ext = getExtension(params.audioFileName || params.referenceAudioUri);
@@ -412,7 +416,7 @@ export async function generateSpeech(
       if (onProgress) onProgress(25, "正在上傳聲音檔案至伺服器...");
 
       const profileName = `echo_${timestamp}`;
-      const uploadResult = await restUploadProfile(profileName, audioBase64, mimeType);
+      const uploadResult = await restUploadProfile(profileName, audioBase64, mimeType, params.referenceText);
       voiceProfileId = uploadResult?.profileId ?? undefined;
 
       if (!voiceProfileId) {
