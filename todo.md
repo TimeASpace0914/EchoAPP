@@ -157,3 +157,19 @@
 - [x] 後端生成音檔後處理：裁剪開頭雜訊 + 輕微降噪
 - [x] 後端 reference_text 改為更精確描述「這是一段親友生前的語音錄音」
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第十九輪需求（生成流程優化 + 排版修復）
+- [x] ffmpeg 簡化：移除 afftdn 降噪和 loudnorm 音量標準化（太重導致延遲）
+- [x] ffmpeg 只保留 silenceremove（裁剪開頭靜音），timeout 從 30s 降到 15s
+- [x] 移除生成後音檔後處理（避免額外 ffmpeg 延遲）
+- [x] 後端 storagePut 改為非阻塞（不等待 storage 上傳完成才回應）
+- [x] 後端輪詢間隔從 5s 縮短到 3s（更快偵測完成狀態）
+- [x] 後端 POST /generate 重試次數從 3 增加到 5
+- [x] 前端 timeout 從 600s 降到 420s（配合後端 6 分鐘輪詢 + 餘裕）
+- [x] 前端加入模擬進度推進（每 3 秒 +1%，5 階段文字提示）
+- [x] 生成進度卡片排版修復（padding 28→20、gap 20→16）
+- [x] generatingHeader 改為 row 佈局（標題左、計時器右）
+- [x] genProgressInfoRow 改為垂直排列（避免窄螢幕溢出）
+- [x] generatingAnimRow 加入 width 100% 和 waveContainerSmall maxWidth 200
+- [x] personalityHeader 加入 width 100% 和 flexShrink
+- [x] 端到端測試通過（上傳 5s + 生成 103s = 總計 108s，RMS=3693.9）

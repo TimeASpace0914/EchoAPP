@@ -300,12 +300,12 @@ async function restGenerateSpeech(
         ...(options?.engine && { engine: options.engine }),
         ...(options?.seed !== undefined && { seed: options.seed }),
       }),
-      signal: createTimeoutSignal(600000),
+      signal: createTimeoutSignal(420000),
     });
   } catch (err) {
     throw new Error(
       err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
-        ? "語音生成逾時（超過 10 分鐘），請縮短文字後再試。"
+        ? "語音生成逾時（超過 7 分鐘），請縮短文字後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
   }
@@ -430,7 +430,23 @@ export async function generateSpeech(
   // 階段 2：生成語音
   if (onProgress) onProgress(40, "AI 正在學習聲音特徵...");
 
-  if (onProgress) onProgress(50, "正在生成語音，請耐心等待...");
+  // 模擬進度推進，讓用戶感覺有在動
+  let progressTimer: ReturnType<typeof setInterval> | null = null;
+  let currentProgress = 45;
+  const stageTexts = [
+    "AI 正在分析聲音特徵...",
+    "正在生成語音波形...",
+    "正在合成語音內容...",
+    "正在優化語音品質...",
+    "即將完成，請稍候...",
+  ];
+  progressTimer = setInterval(() => {
+    if (currentProgress < 85) {
+      currentProgress += 1;
+      const stageIdx = Math.min(Math.floor((currentProgress - 45) / 8), stageTexts.length - 1);
+      if (onProgress) onProgress(currentProgress, stageTexts[stageIdx]);
+    }
+  }, 3000);
 
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
@@ -438,6 +454,8 @@ export async function generateSpeech(
     engine: params.engine,
     seed: params.seed,
   });
+
+  if (progressTimer) clearInterval(progressTimer);
 
   if (!result) {
     if (onProgress) onProgress(100, "生成失敗");

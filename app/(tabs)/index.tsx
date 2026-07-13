@@ -802,15 +802,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    width: "100%",
   },
   personalityHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 1,
   },
   personalityTitle: {
     fontSize: 14,
     fontWeight: "600",
+    flexShrink: 1,
   },
   personalityBody: {
     marginTop: 12,
@@ -852,11 +855,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    gap: 12,
+    width: "100%",
   },
   waveContainerSmall: {
     flex: 1,
     alignItems: "center",
+    maxWidth: 200,
   },
   genTimerWrap: {
     backgroundColor: "rgba(0,0,0,0.05)",
@@ -870,13 +875,15 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   genProgressInfoRow: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 4,
     marginTop: 6,
+    width: "100%",
   },
   genProgressHint: {
     fontSize: 11,
+    textAlign: "center",
   },
   emotionTagsRow: {
     flexDirection: "row",
@@ -900,9 +907,9 @@ const styles = StyleSheet.create({
   },
   generatingCard: {
     borderRadius: 20,
-    padding: 28,
+    padding: 20,
     alignItems: "center",
-    gap: 20,
+    gap: 16,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -914,11 +921,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   generatingHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
   },
   generatingInfo: {
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 4,
+    flexShrink: 1,
   },
   generatingTitle: {
     fontSize: 17,

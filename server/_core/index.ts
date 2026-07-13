@@ -124,20 +124,16 @@ async function startServer() {
         res.status(502).json({ success: false, error: result.error, details: result.details });
         return;
       }
-      let storageUrl: string | null = null;
-      try {
-        const audioBuffer = Buffer.from(result.audio, "base64");
-        const { url } = await storagePut(`voice-clone/${Date.now()}.wav`, audioBuffer, "audio/wav");
-        storageUrl = url;
-      } catch {
-        // 儲存失敗不影響主流程
-      }
+      // 先回應音檔給用戶端，storage 上傳改為非阻塞
       res.json({
         success: true,
         audioBase64: result.audio,
         duration: result.duration ?? null,
-        storageUrl,
+        storageUrl: null,
       });
+
+      // 背景上傳到 storage（不阻塞回應）
+      storagePut(`voice-clone/${Date.now()}.wav`, Buffer.from(result.audio, "base64"), "audio/wav").catch(() => {});
     } catch (error) {
       res.status(500).json({ success: false, error: error instanceof Error ? error.message : "未知錯誤" });
     }

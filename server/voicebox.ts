@@ -33,17 +33,15 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
     fs.writeFileSync(inputPath, inputBuffer);
 
     // 使用 ffmpeg 轉換為標準 WAV 格式
-    // 1. 裁剪開頭靜音（避免 Voicebox 把靜音當成語音特徵，產生前導雜訊）
-    // 2. 音量標準化（loudnorm 確保音量一致）
-    // 3. 保留原始採樣率和聲道數
+    // 只做容器轉換 + 裁剪開頭靜音，不做重運算的降噪/標準化（避免處理太久）
     await execFileAsync("ffmpeg", [
-      "-y",                   // 覆寫輸出
-      "-i", inputPath,         // 輸入
-      "-af", "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,afftdn=nr=10,loudnorm=I=-16:LRA=11:TP=-1.5",  // 裁剪開頭靜音 + 降噪 + 音量標準化
-      "-c:a", "pcm_s16le",    // 音頻編碼：16-bit PCM little-endian
-      "-f", "wav",            // 輸出格式
+      "-y",
+      "-i", inputPath,
+      "-af", "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB",
+      "-c:a", "pcm_s16le",
+      "-f", "wav",
       outputPath,
-    ], { timeout: 30000 });
+    ], { timeout: 15000 });
 
     // 讀取轉換後的檔案
     const wavBuffer = fs.readFileSync(outputPath);
@@ -314,7 +312,7 @@ export async function generateVoiceboxSpeech(
         ...(request.engine && { engine: request.engine }),
         ...(request.seed !== undefined && { seed: request.seed }),
       }),
-    }, 120000, 3);
+    }, 120000, 5);
 
     if (!genRes.ok) {
       const errText = await genRes.text().catch(() => "");
@@ -335,9 +333,9 @@ export async function generateVoiceboxSpeech(
     };
   }
 
-  // 步驟 2：輪詢生成狀態（最多等待 10 分鐘）
+  // 步驟 2：輪詢生成狀態（最多等待 6 分鐘，每 3 秒查詢一次）
   const maxPolls = 120;
-  const pollInterval = 5000;
+  const pollInterval = 3000;
   let finalStatus: string = "generating";
   let duration: number | null = null;
   let errorMsg: string | null = null;
@@ -379,7 +377,7 @@ export async function generateVoiceboxSpeech(
 
   if (finalStatus !== "completed") {
     return {
-      error: "語音生成逾時（超過 10 分鐘）",
+      error: "語音生成逾時（超過 6 分鐘）",
       code: "GENERATION_FAILED",
       details: "生成狀態持續為 generating，請稍後再試或縮短文字",
     };
@@ -427,35 +425,7 @@ export async function generateVoiceboxSpeech(
       // 不阻擋，但記錄警告 — Voicebox 可能回傳非標準格式
     }
     
-    // 對生成的音檔進行後處理：裁剪開頭靜音/雜訊
-    let processedAudio = audioBytes;
-    try {
-      const tmpIn = path.join(os.tmpdir(), `vb_gen_in_${Date.now()}.wav`);
-      const tmpOut = path.join(os.tmpdir(), `vb_gen_out_${Date.now()}.wav`);
-      fs.writeFileSync(tmpIn, audioBytes);
-      
-      // 裁剪開頭 0.3 秒的靜音/雜訊，並輕微降噪
-      await execFileAsync("ffmpeg", [
-        "-y",
-        "-i", tmpIn,
-        "-af", "silenceremove=start_periods=1:start_silence=0:start_threshold=-40dB,afftdn=nr=5",
-        "-c:a", "pcm_s16le",
-        "-f", "wav",
-        tmpOut,
-      ], { timeout: 15000 });
-      
-      const cleaned = fs.readFileSync(tmpOut);
-      if (cleaned.length > 100) {
-        console.log(`[Voicebox] Post-processed audio: ${audioBytes.length}bytes → ${cleaned.length}bytes (silence trimmed)`, );
-        processedAudio = cleaned;
-      }
-      try { fs.unlinkSync(tmpIn); } catch {}
-      try { fs.unlinkSync(tmpOut); } catch {}
-    } catch (postErr) {
-      console.warn(`[Voicebox] Post-processing failed, using raw audio:`, postErr instanceof Error ? postErr.message : postErr);
-    }
-
-    const audioBase64 = processedAudio.toString("base64");
+    const audioBase64 = audioBytes.toString("base64");
 
     return {
       audio: audioBase64,
