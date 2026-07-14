@@ -248,41 +248,30 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // 不送 reference_text，讓 Voicebox 自行分析音檔特徵
-    // 之前送假的 reference_text 會導致 Voicebox 驗證失敗 (HTTP 400: Invalid reference audio)
-    const endBoundary = Buffer.from(`--${boundary}--\r\n`);
+    // reference_text 是 Voicebox 必填欄位
+    // 若用戶有提供真實的轉錄文字則使用，否則用通用文字
+    // 注意：之前的 400 錯誤是因為跳過 ffmpeg 轉換導致音檔格式不被接受，
+    // 現在已恢復 ffmpeg 標準 16kHz 單聲道 WAV 轉換，通用 reference_text 不會造成問題
+    const actualReferenceText = (referenceText && referenceText.trim().length > 0)
+      ? referenceText
+      : '這是一段語音錄音';
     
-    // 若用戶有提供真實的 reference_text 才加入
-    let sampleRes: Response;
-    if (referenceText && referenceText.trim().length > 0) {
-      const textPart = Buffer.from(
-        `--${boundary}\r\n` +
-        `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
-        `${referenceText}\r\n`
-      );
-      const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
-      console.log(`[Voicebox] Uploading sample with user-provided reference_text: "${referenceText.substring(0, 50)}"`);
-      sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
-        method: "POST",
-        headers: {
-          ...NGROK_HEADERS,
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        },
-        body: multipartBody,
-      }, 60000, 2);
-    } else {
-      // 不送 reference_text，讓 Voicebox 自行分析音檔
-      const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, endBoundary]);
-      console.log(`[Voicebox] Uploading sample without reference_text (let Voicebox analyze)`);
-      sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
-        method: "POST",
-        headers: {
-          ...NGROK_HEADERS,
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        },
-        body: multipartBody,
-      }, 60000, 2);
-    }
+    const endBoundary = Buffer.from(`--${boundary}--\r\n`);
+    const textPart = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
+      `${actualReferenceText}\r\n`
+    );
+    const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
+    console.log(`[Voicebox] Uploading sample with reference_text: "${actualReferenceText.substring(0, 50)}"`);
+    const sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
+      method: "POST",
+      headers: {
+        ...NGROK_HEADERS,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: multipartBody,
+    }, 60000, 2);
 
     if (!sampleRes.ok) {
       const errText = await sampleRes.text().catch(() => "");

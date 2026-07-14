@@ -220,3 +220,8 @@
 - [x] sample upload timeout 從 90s 降為 60s，重試從 3 次降為 2 次
 - [x] 前端移除「正在轉錄語音內容」進度文字（不再做轉錄）
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第二十六輪需求（恢復 reference_text 必填欄位）
+- [x] Voicebox 的 reference_text 是必填欄位（不送會 422），恢復通用 reference_text
+- [x] 之前 400 錯誤的真正原因是跳過 ffmpeg 轉換導致音檔格式不被接受，現在已恢復 ffmpeg 16kHz 單聲道標準轉換
+- [x] TypeScript 型別檢查通過（0 errors）
