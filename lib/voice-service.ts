@@ -410,7 +410,6 @@ export async function generateSpeech(
   // 若沒有 profile ID，先上傳音檔建立 profile
   if (!voiceProfileId) {
     if (onProgress) onProgress(10, "正在分析參考音檔內容...");
-    if (onProgress) onProgress(15, "正在轉錄語音內容...");
     try {
       // 使用 picker 提供的真實 mimeType，否則從副檔名推導
       const ext = getExtension(params.audioFileName || params.referenceAudioUri);

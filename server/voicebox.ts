@@ -32,10 +32,12 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
     // 寫入輸入檔案
     fs.writeFileSync(inputPath, inputBuffer);
 
-    // 使用 ffmpeg 純容器轉換為 WAV（不加任何濾鏡，最快速度）
+    // 使用 ffmpeg 轉換為標準 16kHz 單聲道 WAV（Voicebox 最佳相容格式）
     await execFileAsync("ffmpeg", [
       "-y",
       "-i", inputPath,
+      "-ar", "16000",   // 16kHz 採樣率
+      "-ac", "1",        // 單聲道
       "-c:a", "pcm_s16le",
       "-f", "wav",
       outputPath,
@@ -246,29 +248,20 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // reference_text — 若用戶已提供則直接使用，否則使用通用 fallback
-    // Whisper 轉錄已改為非阻塞：先使用通用 reference_text 快速上傳，不等待轉錄完成
-    // Voicebox 會自行分析音檔特徵，reference_text 僅為輔助參考
-    let actualReferenceText = referenceText;
-    
-    if (!actualReferenceText) {
-      actualReferenceText = '這是一段親友生前的語音錄音';
-      console.log('[Voicebox] Using generic reference_text (skip Whisper to speed up upload)');
-    }
-    
-    // ending boundary
+    // 不送 reference_text，讓 Voicebox 自行分析音檔特徵
+    // 之前送假的 reference_text 會導致 Voicebox 驗證失敗 (HTTP 400: Invalid reference audio)
     const endBoundary = Buffer.from(`--${boundary}--\r\n`);
     
-    // 若有有效的 reference_text 才加入，否則只送音檔
+    // 若用戶有提供真實的 reference_text 才加入
     let sampleRes: Response;
-    if (actualReferenceText) {
+    if (referenceText && referenceText.trim().length > 0) {
       const textPart = Buffer.from(
         `--${boundary}\r\n` +
         `Content-Disposition: form-data; name="reference_text"\r\n\r\n` +
-        `${actualReferenceText}\r\n`
+        `${referenceText}\r\n`
       );
       const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
-      console.log(`[Voicebox] Uploading sample with reference_text: "${actualReferenceText.substring(0, 50)}"`);
+      console.log(`[Voicebox] Uploading sample with user-provided reference_text: "${referenceText.substring(0, 50)}"`);
       sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
         method: "POST",
         headers: {
@@ -276,11 +269,11 @@ export async function uploadVoiceProfile(
           "Content-Type": `multipart/form-data; boundary=${boundary}`,
         },
         body: multipartBody,
-      }, 90000, 3);
+      }, 60000, 2);
     } else {
       // 不送 reference_text，讓 Voicebox 自行分析音檔
       const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, endBoundary]);
-      console.log(`[Voicebox] Uploading sample without reference_text`);
+      console.log(`[Voicebox] Uploading sample without reference_text (let Voicebox analyze)`);
       sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
         method: "POST",
         headers: {
@@ -288,7 +281,7 @@ export async function uploadVoiceProfile(
           "Content-Type": `multipart/form-data; boundary=${boundary}`,
         },
         body: multipartBody,
-      }, 90000, 3);
+      }, 60000, 2);
     }
 
     if (!sampleRes.ok) {
@@ -341,7 +334,7 @@ export async function generateVoiceboxSpeech(
         ...(request.engine && { engine: request.engine }),
         ...(request.seed !== undefined && { seed: request.seed }),
       }),
-    }, 120000, 5);
+    }, 60000, 2);
 
     if (!genRes.ok) {
       const errText = await genRes.text().catch(() => "");
@@ -362,9 +355,9 @@ export async function generateVoiceboxSpeech(
     };
   }
 
-  // 步驟 2：輪詢生成狀態（最多等待 6 分鐘，每 3 秒查詢一次）
+  // 步驟 2：輪詢生成狀態（最多等待 4 分鐘，每 2 秒查詢一次）
   const maxPolls = 120;
-  const pollInterval = 3000;
+  const pollInterval = 2000;
   let finalStatus: string = "generating";
   let duration: number | null = null;
   let errorMsg: string | null = null;
@@ -406,7 +399,7 @@ export async function generateVoiceboxSpeech(
 
   if (finalStatus !== "completed") {
     return {
-      error: "語音生成逾時（超過 6 分鐘）",
+      error: "語音生成逾時（超過 4 分鐘）",
       code: "GENERATION_FAILED",
       details: "生成狀態持續為 generating，請稍後再試或縮短文字",
     };

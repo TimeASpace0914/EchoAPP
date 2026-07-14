@@ -211,3 +211,12 @@
 - [x] 恢復 ffmpeg 轉換但移除 silenceremove 濾鏡，只做純容器轉換（pcm_s16le），timeout 降為 10 秒
 - [x] 格式提示寬度修復：uploadPlaceholder 加入 width 100%，formatHintBox 加入 maxWidth 100%
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第二十五輪需求（根本修復：reference_text + ffmpeg 標準化 + 重試削減）
+- [x] 移除假的 reference_text（"這是一段親友生前的語音錄音"），改為不送此欄位讓 Voicebox 自行分析音檔特徵
+- [x] ffmpeg 加入 -ar 16000 -ac 1 產生標準 16kHz 單聲道 WAV（Voicebox 最佳相容格式）
+- [x] generate 重試從 5 次降為 2 次，timeout 從 120s 降為 60s
+- [x] 輪詢間隔從 3 秒降為 2 秒，最多等待 4 分鐘（原 6 分鐘）
+- [x] sample upload timeout 從 90s 降為 60s，重試從 3 次降為 2 次
+- [x] 前端移除「正在轉錄語音內容」進度文字（不再做轉錄）
+- [x] TypeScript 型別檢查通過（0 errors）
