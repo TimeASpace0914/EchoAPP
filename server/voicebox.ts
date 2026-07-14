@@ -32,16 +32,14 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
     // 寫入輸入檔案
     fs.writeFileSync(inputPath, inputBuffer);
 
-    // 使用 ffmpeg 轉換為標準 WAV 格式
-    // 只做容器轉換 + 裁剪開頭靜音，不做重運算的降噪/標準化（避免處理太久）
+    // 使用 ffmpeg 純容器轉換為 WAV（不加任何濾鏡，最快速度）
     await execFileAsync("ffmpeg", [
       "-y",
       "-i", inputPath,
-      "-af", "silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB",
       "-c:a", "pcm_s16le",
       "-f", "wav",
       outputPath,
-    ], { timeout: 15000 });
+    ], { timeout: 10000 });
 
     // 讀取轉換後的檔案
     const wavBuffer = fs.readFileSync(outputPath);
@@ -222,10 +220,18 @@ export async function uploadVoiceProfile(
     
     console.log(`[Voicebox] Upload debug: mimeType=${mimeType}, originalExt=${originalExt}, audioSize=${binaryData.length}bytes`);
     
-    // 直接上傳原始音檔，跳過 ffmpeg 轉換以避免超時
-    // Voicebox 本身能處理多種格式（mp3, m4a, wav 等），不需要前端轉換
+    // 非 WAV 格式用 ffmpeg 快速轉換（僅容器轉換，不加濾鏡，避免超時）
     let uploadMimeType = mimeType;
     let uploadExt = originalExt;
+    if (originalExt !== "wav") {
+      console.log(`[Voicebox] Quick converting ${originalExt} → wav (no filters)...`);
+      const convertedBuffer = await convertToWav(binaryData, originalExt);
+      if (convertedBuffer.length !== binaryData.length || !convertedBuffer.equals(binaryData)) {
+        binaryData = convertedBuffer;
+        uploadMimeType = "audio/wav";
+        uploadExt = "wav";
+      }
+    }
     
     const fileName = `reference.${uploadExt}`;
     

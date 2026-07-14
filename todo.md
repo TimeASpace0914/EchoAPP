@@ -206,3 +206,8 @@
 - [x] 格式提示 icon 手機端跑掉修復：移除 flexWrap（避免圖示換行到下一行），加入 flex:1 讓文字收縮
 - [x] 移除生成語音的旋轉讀條（ActivityIndicator），只保留音波脈動動畫
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第二十四輪需求（恢復 ffmpeg 快速轉換 + 格式提示寬度修復）
+- [x] 恢復 ffmpeg 轉換但移除 silenceremove 濾鏡，只做純容器轉換（pcm_s16le），timeout 降為 10 秒
+- [x] 格式提示寬度修復：uploadPlaceholder 加入 width 100%，formatHintBox 加入 maxWidth 100%
+- [x] TypeScript 型別檢查通過（0 errors）

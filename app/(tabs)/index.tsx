@@ -649,6 +649,7 @@ const styles = StyleSheet.create({
   uploadPlaceholder: {
     alignItems: "center",
     gap: 12,
+    width: "100%",
   },
   uploadIconWrap: {
     width: 80,
@@ -674,6 +675,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 4,
     width: "100%",
+    maxWidth: "100%",
   },
   formatHintRow: {
     flexDirection: "row",
