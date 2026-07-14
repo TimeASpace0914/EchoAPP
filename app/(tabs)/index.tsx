@@ -527,12 +527,9 @@ export default function HomeScreen() {
         {/* 生成按鈕 / 生成進度 / 錯誤提示 */}
         {isGenerating ? (
           <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-            {/* 旋轉載入 + 音波脈動 */}
-            <View style={styles.generatingAnimRow}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <View style={styles.waveContainerSmall}>
-                <Waveform active={true} color={colors.primary} height={40} barCount={20} />
-              </View>
+            {/* 音波脈動 */}
+            <View style={styles.waveContainer}>
+              <Waveform active={true} color={colors.primary} height={40} barCount={20} />
             </View>
 
             <View style={styles.generatingHeader}>
@@ -682,12 +679,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    flexWrap: "wrap",
   },
   formatHintText: {
     fontSize: 12,
     fontWeight: "500",
     flexShrink: 1,
+    flex: 1,
   },
   formatHintSub: {
     fontSize: 11,

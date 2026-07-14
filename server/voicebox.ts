@@ -172,7 +172,7 @@ export async function uploadVoiceProfile(
       profileBody.personality = personality;
     }
     if (description) {
-      profileBody.design_prompt = description;
+      profileBody.description = description;
     }
     const createRes = await fetchWithRetry(`${baseUrl}/profiles`, {
       method: "POST",
