@@ -160,15 +160,19 @@ export async function uploadVoiceProfile(
   mimeType: string = "audio/wav",
   referenceText?: string,
   personality?: string,
+  description?: string,
 ): Promise<{ profile_id: string; name: string } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
 
-  // 步驟 1：建立 Profile（JSON），若有個性設定則一同送出
+  // 步驟 1：建立 Profile（JSON），若有個性設定或聲音描述則一同送出
   let profileId: string;
   try {
     const profileBody: Record<string, string> = { name, language: "zh", voice_type: "cloned" };
     if (personality) {
       profileBody.personality = personality;
+    }
+    if (description) {
+      profileBody.design_prompt = description;
     }
     const createRes = await fetchWithRetry(`${baseUrl}/profiles`, {
       method: "POST",
@@ -218,18 +222,10 @@ export async function uploadVoiceProfile(
     
     console.log(`[Voicebox] Upload debug: mimeType=${mimeType}, originalExt=${originalExt}, audioSize=${binaryData.length}bytes`);
     
-    // 如果不是 WAV，先用 ffmpeg 轉換為標準 WAV 格式
+    // 直接上傳原始音檔，跳過 ffmpeg 轉換以避免超時
+    // Voicebox 本身能處理多種格式（mp3, m4a, wav 等），不需要前端轉換
     let uploadMimeType = mimeType;
     let uploadExt = originalExt;
-    if (originalExt !== "wav") {
-      console.log(`[Voicebox] Converting ${originalExt} → wav via ffmpeg...`);
-      const convertedBuffer = await convertToWav(binaryData, originalExt);
-      if (convertedBuffer.length !== binaryData.length || !convertedBuffer.equals(binaryData)) {
-        binaryData = convertedBuffer;
-        uploadMimeType = "audio/wav";
-        uploadExt = "wav";
-      }
-    }
     
     const fileName = `reference.${uploadExt}`;
     

@@ -88,9 +88,10 @@ async function startServer() {
         res.status(400).json({ success: false, error: "缺少必要參數 name 或 audioBase64" });
         return;
       }
-      // 將 description 作為 profile name（若有），personality 傳給 Voicebox 作為個性設定
-      const profileName = description || name;
-      const result = await uploadVoiceProfile(profileName, audioBase64, mimeType || "audio/wav", referenceText, personality);
+      // description 傳給 Voicebox 作為 design_prompt（聲音描述，輔助 AI 模仿）
+      // personality 傳給 Voicebox 作為 personality（語氣與個性設定）
+      // profile name 保持原始 name（自動產生的 echo_timestamp）
+      const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav", referenceText, personality, description);
       if ("error" in result) {
         res.status(502).json({ success: false, error: result.error, details: result.details });
         return;

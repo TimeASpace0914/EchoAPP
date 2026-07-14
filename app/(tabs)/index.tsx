@@ -333,10 +333,10 @@ export default function HomeScreen() {
                 <TextInput
                   style={[styles.descriptionInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground }]}
                   value={voiceDescription}
-                  onChangeText={(val) => setVoiceDescription(val.slice(0, 30))}
-                  placeholder="例如：爸爸的聲音"
+                  onChangeText={(val) => setVoiceDescription(val.slice(0, 50))}
+                  placeholder="例如：中年男性，聲音低沉溫厚"
                   placeholderTextColor={colors.muted}
-                  maxLength={30}
+                  maxLength={50}
                   returnKeyType="done"
                 />
               </View>
@@ -673,23 +673,21 @@ const styles = StyleSheet.create({
   formatHintBox: {
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 4,
     width: "100%",
-    alignSelf: "stretch",
   },
   formatHintRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    flexShrink: 1,
+    gap: 6,
+    flexWrap: "wrap",
   },
   formatHintText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "500",
     flexShrink: 1,
-    flex: 1,
   },
   formatHintSub: {
     fontSize: 11,

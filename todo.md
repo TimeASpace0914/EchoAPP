@@ -192,3 +192,11 @@
 - [x] 修復格式提示版面：formatHintBox 加入 alignSelf stretch，formatHintRow 移除 flexWrap 改用 flexShrink，formatHintText 加入 flex:1
 - [x] 生成速度優化：移除 Whisper 轉錄阻塞流程，直接使用通用 reference_text 上傳
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第二十二輪需求（格式提示還原 + 跳過 ffmpeg + description 改為 design_prompt）
+- [x] 格式提示樣式還原為上一版（formatHintBox 移除 alignSelf stretch，formatHintRow 恢復 flexWrap，formatHintText 恢復 fontSize 12 + flexShrink）
+- [x] 跳過 ffmpeg 音檔轉換（直接上傳原始音檔給 Voicebox，避免轉換超時）
+- [x] 後端 upload 端點：description 不再作為 profile name，改為傳給 uploadVoiceProfile 第六參數
+- [x] uploadVoiceProfile 加入 description 參數，映射到 Voicebox 的 design_prompt 欄位
+- [x] 聲音描述 placeholder 改為「例如：中年男性，聲音低沉溫厚」，字數上限 50 字
+- [x] TypeScript 型別檢查通過（0 errors）
