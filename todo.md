@@ -225,3 +225,10 @@
 - [x] Voicebox 的 reference_text 是必填欄位（不送會 422），恢復通用 reference_text
 - [x] 之前 400 錯誤的真正原因是跳過 ffmpeg 轉換導致音檔格式不被接受，現在已恢復 ffmpeg 16kHz 單聲道標準轉換
 - [x] TypeScript 型別檢查通過（0 errors）
+
+## 第二十七輪需求（生成速度診斷 + VOICEBOX_URL 更新 + 前端體驗優化）
+- [x] 更新 VOICEBOX_URL 為今日新的 Cloudflare Tunnel URL
+- [x] 實測完整生成流程：總耗時 134 秒，瓶頸在 Voicebox AI 模型載入(27s)和語音合成(91s)，佔 88%
+- [x] 前端 timeout 從 420s 降為 300s（5 分鐘，足夠涵蓋正常生成時間）
+- [x] 進度提示文字更新為「語音生成約需 2-3 分鐘，AI 正在學習聲音特徵」
+- [x] 格式提示版面修復確認
