@@ -72,6 +72,57 @@ function createTimeoutSignal(ms: number): AbortSignal {
 const NGROK_HEADERS = { "ngrok-skip-browser-warning": "true" };
 
 /**
+ * 使用 Voicebox 的 /transcribe 端點自動轉錄音檔，取得真實 reference_text
+ * 這是解決「胡言亂語」問題的關鍵：假的 reference_text 會被 AI 當成要說的內容
+ */
+async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string | null> {
+  const baseUrl = getVoiceboxUrl();
+  const boundary = `----TranscribeBoundary${Date.now()}`;
+  const ext = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : "m4a";
+  const fileName = `audio.${ext}`;
+
+  const fileHeader = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+    `Content-Type: ${mimeType}\r\n\r\n`
+  );
+  const fileFooter = Buffer.from("\r\n");
+  const textPart = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="language"\r\n\r\n` +
+    `zh\r\n`
+  );
+  const endBoundary = Buffer.from(`--${boundary}--\r\n`);
+  const multipartBody = Buffer.concat([fileHeader, audioBuffer, fileFooter, textPart, endBoundary]);
+
+  try {
+    console.log(`[Voicebox] Transcribing audio for real reference_text (${audioBuffer.length} bytes)...`);
+    const res = await fetchWithRetry(`${baseUrl}/transcribe`, {
+      method: "POST",
+      headers: {
+        ...NGROK_HEADERS,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      },
+      body: multipartBody,
+    }, 60000, 2);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.warn(`[Voicebox] Transcribe failed: HTTP ${res.status}: ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const result = await res.json() as { text: string; duration: number };
+    const transcribedText = result.text?.trim() || null;
+    console.log(`[Voicebox] Transcribed: "${transcribedText?.substring(0, 100)}" (duration: ${result.duration}s)`);
+    return transcribedText;
+  } catch (error) {
+    console.warn(`[Voicebox] Transcribe error:`, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+/**
  * 帶重試的 fetch（ngrok 連線不穩定時自動重試）
  */
 async function fetchWithRetry(
@@ -249,12 +300,22 @@ export async function uploadVoiceProfile(
     const fileFooter = Buffer.from("\r\n");
     
     // reference_text 是 Voicebox 必填欄位
-    // 若用戶有提供真實的轉錄文字則使用，否則用通用文字
-    // 注意：之前的 400 錯誤是因為跳過 ffmpeg 轉換導致音檔格式不被接受，
-    // 現在已恢復 ffmpeg 標準 16kHz 單聲道 WAV 轉換，通用 reference_text 不會造成問題
-    const actualReferenceText = (referenceText && referenceText.trim().length > 0)
+    // 關鍵修復：使用 Voicebox /transcribe 端點自動轉錄音檔，取得真實的 reference_text
+    // 之前送假的 reference_text（「這是一段語音錄音」）導致 AI 把這段假文字也唸出來（胡言亂語）
+    let actualReferenceText = (referenceText && referenceText.trim().length > 0)
       ? referenceText
-      : '這是一段語音錄音';
+      : null;
+
+    // 若沒有提供真實的 reference_text，用 Voicebox 自動轉錄
+    if (!actualReferenceText) {
+      console.log(`[Voicebox] No reference_text provided, auto-transcribing audio...`);
+      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType);
+      // 若轉錄也失敗，用最小化的通用文字（不會被 AI 當成要說的內容）
+      if (!actualReferenceText) {
+        actualReferenceText = '嗯';
+        console.warn(`[Voicebox] Transcribe failed, using minimal fallback: "${actualReferenceText}"`);
+      }
+    }
     
     const endBoundary = Buffer.from(`--${boundary}--\r\n`);
     const textPart = Buffer.from(
@@ -344,8 +405,9 @@ export async function generateVoiceboxSpeech(
     };
   }
 
-  // 步驟 2：輪詢生成狀態（最多等待 4 分鐘，每 2 秒查詢一次）
-  const maxPolls = 120;
+  // 步驟 2：輪詢生成狀態（最多等待 6 分鐘，每 2 秒查詢一次）
+  // 實測 qwen/1.7B 需要約 165 秒，預留充分時間
+  const maxPolls = 180;
   const pollInterval = 2000;
   let finalStatus: string = "generating";
   let duration: number | null = null;
@@ -388,7 +450,7 @@ export async function generateVoiceboxSpeech(
 
   if (finalStatus !== "completed") {
     return {
-      error: "語音生成逾時（超過 4 分鐘）",
+      error: "語音生成逾時（超過 6 分鐘）",
       code: "GENERATION_FAILED",
       details: "生成狀態持續為 generating，請稍後再試或縮短文字",
     };

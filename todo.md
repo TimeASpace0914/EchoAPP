@@ -232,3 +232,13 @@
 - [x] 前端 timeout 從 420s 降為 300s（5 分鐘，足夠涵蓋正常生成時間）
 - [x] 進度提示文字更新為「語音生成約需 2-3 分鐘，AI 正在學習聲音特徵」
 - [x] 格式提示版面修復確認
+
+## 第二十八輪需求（胡言亂語根本修復 + timeout 延長）
+
+- [x] 使用 Voicebox /transcribe 端點自動轉錄音檔，取得真實 reference_text
+- [x] 移除假的 reference_text（「這是一段語音錄音」），改為自動轉錄
+- [x] 轉錄失敗時使用最小化 fallback「嗯」而非完整假句子
+- [x] 後端輪詢 timeout 從 4 分鐘延長至 6 分鐘（實測 qwen/1.7B 需 165 秒）
+- [x] 前端 timeout 從 5 分鐘延長至 10 分鐘
+- [x] 進度提示新增「AI 正在載入語音模型...」階段
+- [x] TypeScript 0 errors

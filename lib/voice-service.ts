@@ -314,12 +314,12 @@ async function restGenerateSpeech(
         ...(options?.engine && { engine: options.engine }),
         ...(options?.seed !== undefined && { seed: options.seed }),
       }),
-      signal: createTimeoutSignal(420000),
+      signal: createTimeoutSignal(600000),
     });
   } catch (err) {
     throw new Error(
       err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
-        ? "語音生成逾時（超過 7 分鐘），請縮短文字後再試。"
+        ? "語音生成逾時（超過 10 分鐘），請縮短文字後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
   }
@@ -409,7 +409,7 @@ export async function generateSpeech(
 
   // 若沒有 profile ID，先上傳音檔建立 profile
   if (!voiceProfileId) {
-    if (onProgress) onProgress(10, "正在分析參考音檔內容...");
+    if (onProgress) onProgress(10, "正在轉錄參考音檔內容...");
     try {
       // 使用 picker 提供的真實 mimeType，否則從副檔名推導
       const ext = getExtension(params.audioFileName || params.referenceAudioUri);
@@ -455,6 +455,7 @@ export async function generateSpeech(
   let progressTimer: ReturnType<typeof setInterval> | null = null;
   let currentProgress = 45;
   const stageTexts = [
+    "AI 正在載入語音模型...",
     "AI 正在分析聲音特徵...",
     "正在生成語音波形...",
     "正在合成語音內容...",
