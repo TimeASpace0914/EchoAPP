@@ -242,3 +242,12 @@
 - [x] 前端 timeout 從 5 分鐘延長至 10 分鐘
 - [x] 進度提示新增「AI 正在載入語音模型...」階段
 - [x] TypeScript 0 errors
+
+## 第二十九輪需求（chatterbox 引擎修復 - 胡言亂語根本解決）
+
+- [x] 實測所有可用引擎：qwen（胡言亂語）、chatterbox（內容完美正確）、chatterbox_turbo（英文幻覺）、kokoro（不支援 cloned）、tada（太慢）
+- [x] 前端預設引擎改為 chatterbox（唯一能正確生成中文內容的引擎）
+- [x] 後端 generate 端點預設引擎改為 chatterbox
+- [x] 進度推進間隔從 3 秒改為 4 秒（匹配 chatterbox 約 260 秒的實際耗時）
+- [x] 等待時間提示從「1-3 分鐘」改為「3-5 分鐘」
+- [x] TypeScript 0 errors

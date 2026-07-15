@@ -563,7 +563,7 @@ export default function HomeScreen() {
                 {genProgress}%
               </Text>
               <Text style={[styles.genProgressHint, { color: colors.muted }]}>
-                語音生成約需 1-3 分鐘，請耐心等待
+                語音生成約需 3-5 分鐘，請耐心等待
               </Text>
             </View>
           </View>

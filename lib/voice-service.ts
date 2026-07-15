@@ -462,18 +462,21 @@ export async function generateSpeech(
     "正在優化語音品質...",
     "即將完成，請稍候...",
   ];
+  // chatterbox 引擎實測約 260 秒，進度推進需更慢以匹配實際耗時
   progressTimer = setInterval(() => {
     if (currentProgress < 85) {
       currentProgress += 1;
-      const stageIdx = Math.min(Math.floor((currentProgress - 45) / 8), stageTexts.length - 1);
+      const stageIdx = Math.min(Math.floor((currentProgress - 45) / 7), stageTexts.length - 1);
       if (onProgress) onProgress(currentProgress, stageTexts[stageIdx]);
     }
-  }, 3000);
-
+  }, 4000);
+  // 使用 chatterbox 引擎（實測唯一能正確生成中文內容的引擎）
+  // qwen 引擎會把 reference_text 混入生成內容導致胡言亂語
+  // chatterbox_turbo 速度快但中文會產生英文幻覺
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
     instruct: params.instruct,
-    engine: params.engine,
+    engine: params.engine || "chatterbox",
     seed: params.seed,
   });
 

@@ -120,10 +120,11 @@ async function startServer() {
       const result = await generateVoiceboxSpeech({
         text,
         profile_id: profileId,
+        // 預設使用 chatterbox 引擎（實測唯一能正確生成中文內容）
+        engine: engine || "chatterbox",
         ...(speed !== undefined && { speed }),
         ...(language && { language }),
         ...(instruct && { instruct }),
-        ...(engine && { engine }),
         ...(seed !== undefined && { seed }),
       });
       if ("error" in result) {
