@@ -251,3 +251,24 @@
 - [x] 進度推進間隔從 3 秒改為 4 秒（匹配 chatterbox 約 260 秒的實際耗時）
 - [x] 等待時間提示從「1-3 分鐘」改為「3-5 分鐘」
 - [x] TypeScript 0 errors
+
+## 第三十輪需求（切回 qwen 引擎 + 生成中可離開 + 下載到手機）
+
+- [ ] 更新 VOICEBOX_URL 為今日新的 Cloudflare Tunnel URL
+- [ ] 切回 qwen 引擎（Qwen-TTS 1.7B 語音克隆效果更好）
+- [ ] 確保 qwen 引擎的 reference_text 正確轉錄，避免胡言亂語
+- [ ] 新增「生成中可離開頁面，完成後通知」功能
+- [ ] 修正下載檔案儲存位置，應存到用戶手機本地（非 APP 沙箱）
+
+## 第三十輪需求（切回 qwen + 生成中可離開 + 下載到手機）
+
+- [x] 更新 VOICEBOX_URL 為今日新的 Cloudflare Tunnel URL
+- [x] 切回 qwen 引擎（Qwen-TTS 1.7B 語音克隆效果更好）
+- [x] 修正 reference_text 轉錄流程：/transcribe timeout 提高到 120 秒容許冷啟動
+- [x] 新增 generationStore 共享狀態管理，支援生成中離開頁面
+- [x] 新增本地通知：生成完成/失敗時發送推播通知
+- [x] 生成進度卡片新增「先離開，完成後通知我」按鈕
+- [x] 離開後回來顯示「語音生成完成」卡片和「查看結果」按鈕
+- [x] 修正下載檔案：使用 expo-media-library saveToLibraryAsync 存到手機媒體庫
+- [x] result.tsx 和 history.tsx 下載邏輯改用 saveAudioToDevice
+- [x] _layout.tsx 加入 expo-notifications 初始化設定

@@ -31,6 +31,7 @@ import {
   SUPPORTED_AUDIO_EXTENSIONS,
   type HistoryEntry,
 } from "@/lib/voice-service";
+import { generationStore, type GenerationState } from "@/lib/generation-store";
 
 const MAX_TEXT_LENGTH = 500;
 
@@ -52,6 +53,12 @@ export default function HomeScreen() {
   const [voiceDescription, setVoiceDescription] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
+  const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
+
+  // 訂閱 generationStore 狀態變化
+  useEffect(() => {
+    return generationStore.subscribe(setGenStoreState);
+  }, []);
 
   // 檢查 Voicebox 連線狀態（非阻塞，不影響 APP 啟動）
   useEffect(() => {
@@ -171,6 +178,7 @@ export default function HomeScreen() {
     setGenStage("準備中...");
     setGenError(null);
     setGenElapsed(0);
+    generationStore.startGeneration();
 
     try {
       const result = await generateSpeech({
@@ -184,6 +192,7 @@ export default function HomeScreen() {
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
+          generationStore.updateProgress(progress, stage);
         },
       });
 
@@ -198,24 +207,37 @@ export default function HomeScreen() {
       };
       await saveHistoryEntry(entry);
 
+      generationStore.completeGeneration({
+        audioUri: result.audioUri,
+        text: text.trim(),
+        duration: result.duration,
+        createdAt: result.createdAt,
+        isRealVoice: result.isRealVoice,
+        entryId: entry.id,
+      });
+
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
-      router.push({
-        pathname: "/result" as any,
-        params: {
-          audioUri: result.audioUri,
-          text: text.trim(),
-          duration: result.duration.toString(),
-          createdAt: result.createdAt.toString(),
-          entryId: entry.id,
-          isRealVoice: result.isRealVoice ? "1" : "0",
-        },
-      });
+      // 只有當用戶仍在頁面上時才自動導航
+      if (isGenerating) {
+        router.push({
+          pathname: "/result" as any,
+          params: {
+            audioUri: result.audioUri,
+            text: text.trim(),
+            duration: result.duration.toString(),
+            createdAt: result.createdAt.toString(),
+            entryId: entry.id,
+            isRealVoice: result.isRealVoice ? "1" : "0",
+          },
+        });
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "語音生成過程中發生未知錯誤";
       setGenError(errorMsg);
+      generationStore.failGeneration(errorMsg);
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
@@ -563,9 +585,70 @@ export default function HomeScreen() {
                 {genProgress}%
               </Text>
               <Text style={[styles.genProgressHint, { color: colors.muted }]}>
-                語音生成約需 3-5 分鐘，請耐心等待
+                語音生成約需 2-4 分鐘，可離開此頁面
               </Text>
             </View>
+            <TouchableOpacity
+              onPress={() => {
+                setIsGenerating(false);
+                setGenProgress(0);
+                setGenStage("");
+              }}
+              style={[styles.dismissButton, { borderColor: colors.border, marginTop: 12, alignSelf: "center" }]}
+            >
+              <Text style={[styles.dismissButtonText, { color: colors.muted }]}>先離開，完成後通知我</Text>
+            </TouchableOpacity>
+          </View>
+        ) : genStoreState.status === "completed" && genStoreState.resultUri && !isGenerating ? (
+          <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+            <View style={[styles.errorIconWrap, { backgroundColor: `${colors.success}15` }]}>
+              <IconSymbol name="checkmark.circle.fill" size={32} color={colors.success} />
+            </View>
+            <Text style={[styles.errorTitle, { color: colors.foreground }]}>
+              語音生成完成
+            </Text>
+            <Text style={[styles.errorMessage, { color: colors.muted }]}>
+              {genStoreState.resultText}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (genStoreState.resultUri && genStoreState.resultCreatedAt) {
+                  router.push({
+                    pathname: "/result" as any,
+                    params: {
+                      audioUri: genStoreState.resultUri,
+                      text: genStoreState.resultText || "",
+                      duration: (genStoreState.resultDuration || 0).toString(),
+                      createdAt: genStoreState.resultCreatedAt.toString(),
+                      entryId: genStoreState.entryId || "",
+                      isRealVoice: genStoreState.resultIsRealVoice ? "1" : "0",
+                    },
+                  });
+                  generationStore.reset();
+                }
+              }}
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            >
+              <Text style={styles.retryButtonText}>查看結果</Text>
+            </TouchableOpacity>
+          </View>
+        ) : genStoreState.status === "error" && !isGenerating && !genError ? (
+          <View style={[styles.errorCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+            <View style={[styles.errorIconWrap, { backgroundColor: `${colors.error}15` }]}>
+              <IconSymbol name="exclamationmark.triangle" size={32} color={colors.error} />
+            </View>
+            <Text style={[styles.errorTitle, { color: colors.error }]}>
+              生成失敗
+            </Text>
+            <Text style={[styles.errorMessage, { color: colors.muted }]}>
+              {genStoreState.error}
+            </Text>
+            <TouchableOpacity
+              onPress={() => generationStore.reset()}
+              style={[styles.dismissButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.dismissButtonText, { color: colors.muted }]}>關閉</Text>
+            </TouchableOpacity>
           </View>
         ) : genError ? (
           <View style={[styles.errorCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>

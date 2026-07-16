@@ -13,6 +13,7 @@ import {
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
+import { saveAudioToDevice } from "@/lib/download-utils";
 import { useFocusEffect, router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -30,17 +31,12 @@ import {
 async function handleDownloadEntry(entry: HistoryEntry) {
   try {
     const fileName = `迴響_${entry.title || formatTimestamp(entry.createdAt).replace(/[^\d]/g, "")}.wav`;
-    const downloadDir = `${FileSystem.documentDirectory}downloads/`;
-    const info = await FileSystem.getInfoAsync(downloadDir);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+    const result = await saveAudioToDevice(entry.audioUri, fileName);
+    if (result.success) {
+      Alert.alert("下載完成", "音檔已儲存至手機媒體庫");
+    } else {
+      Alert.alert("下載失敗", result.error || "無法下載此音檔");
     }
-    const destPath = `${downloadDir}${fileName}`;
-    await FileSystem.copyAsync({ from: entry.audioUri, to: destPath });
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    Alert.alert("下載完成", `音檔已儲存至：\n${destPath}`);
   } catch {
     Alert.alert("下載失敗", "無法下載此音檔");
   }

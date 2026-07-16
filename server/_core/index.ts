@@ -120,8 +120,8 @@ async function startServer() {
       const result = await generateVoiceboxSpeech({
         text,
         profile_id: profileId,
-        // 預設使用 chatterbox 引擎（實測唯一能正確生成中文內容）
-        engine: engine || "chatterbox",
+        // 預設使用 qwen 引擎（Qwen-TTS 語音克隆效果最佳）
+        engine: engine || "qwen",
         ...(speed !== undefined && { speed }),
         ...(language && { language }),
         ...(instruct && { instruct }),

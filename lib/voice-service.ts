@@ -470,13 +470,12 @@ export async function generateSpeech(
       if (onProgress) onProgress(currentProgress, stageTexts[stageIdx]);
     }
   }, 4000);
-  // 使用 chatterbox 引擎（實測唯一能正確生成中文內容的引擎）
-  // qwen 引擎會把 reference_text 混入生成內容導致胡言亂語
-  // chatterbox_turbo 速度快但中文會產生英文幻覺
+  // 使用 qwen 引擎（Qwen-TTS 語音克隆效果最佳，能仿製聲音特徵）
+  // 關鍵：確保 reference_text 是真實轉錄而非假文字，避免胡言亂語
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
     instruct: params.instruct,
-    engine: params.engine || "chatterbox",
+    engine: params.engine || "qwen",
     seed: params.seed,
   });
 

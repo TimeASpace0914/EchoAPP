@@ -104,7 +104,7 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: multipartBody,
-    }, 60000, 2);
+    }, 120000, 2);  // Whisper 模型冷啟動可能需要超過 60 秒
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");

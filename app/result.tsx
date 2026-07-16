@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from "expo-audio";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
+import { saveAudioToDevice } from "@/lib/download-utils";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -131,18 +132,12 @@ export default function ResultScreen() {
     setIsDownloading(true);
     try {
       const fileName = `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}.wav`;
-      const downloadDir = `${FileSystem.documentDirectory}downloads/`;
-      const info = await FileSystem.getInfoAsync(downloadDir);
-      if (!info.exists) {
-        await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+      const result = await saveAudioToDevice(params.audioUri, fileName);
+      if (result.success) {
+        Alert.alert("下載完成", "音檔已儲存至手機媒體庫");
+      } else {
+        Alert.alert("下載失敗", result.error || "無法下載此音檔，請重試");
       }
-      const destPath = `${downloadDir}${fileName}`;
-      await FileSystem.copyAsync({ from: params.audioUri, to: destPath });
-
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      Alert.alert("下載完成", `音檔已儲存至：\n${destPath}`);
     } catch {
       Alert.alert("下載失敗", "無法下載此音檔，請重試");
     } finally {
