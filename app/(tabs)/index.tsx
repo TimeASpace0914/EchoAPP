@@ -128,7 +128,7 @@ export default function HomeScreen() {
           "audio/mpeg",
           "audio/mp3",
           "audio/m4a",
-          "audio/aac",
+
           "audio/flac",
           "audio/ogg",
         ],
@@ -221,6 +221,8 @@ export default function HomeScreen() {
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
+        emotion: selectedEmotion || undefined,
+        speed: speed !== 1.0 ? speed : undefined,
       };
       await saveHistoryEntry(entry);
 
@@ -273,7 +275,7 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [isGenerating]);
 
-  const formatHint = "支援 MP3、WAV、M4A、AAC 等常見音檔格式";
+  const formatHint = "支援 MP3、WAV、M4A 等常見音檔格式";
 
   const EMOTION_PRESETS = [
     "溫柔", "開心", "平靜", "關心", "緩慢", "慈祥", "思念", "鼓勵",

@@ -276,6 +276,27 @@ export default function HistoryScreen() {
             ))}
           </View>
         )}
+        {/* 生成設定：情緒與語速 */}
+        {(item.emotion || item.speed) && (
+          <View style={styles.entrySettingsRow}>
+            {item.emotion && (
+              <View style={[styles.entrySettingChip, { backgroundColor: `${colors.primary}10` }]}>
+                <IconSymbol name="heart.text.square" size={12} color={colors.primary} />
+                <Text style={[styles.entrySettingText, { color: colors.primary }]}>
+                  {item.emotion}
+                </Text>
+              </View>
+            )}
+            {item.speed && (
+              <View style={[styles.entrySettingChip, { backgroundColor: `${colors.primary}10` }]}>
+                <IconSymbol name="gauge.with.dots.needle.67percent" size={12} color={colors.primary} />
+                <Text style={[styles.entrySettingText, { color: colors.primary }]}>
+                  {item.speed.toFixed(1)}x
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
         <View style={styles.entryFooter}>
           <Text style={[styles.entryMeta, { color: colors.muted }]}>
             {formatTimestamp(item.createdAt)} · {formatDuration(item.duration)}
@@ -565,6 +586,23 @@ const styles = StyleSheet.create({
   },
   entryTagText: {
     fontSize: 12,
+    fontWeight: "500",
+  },
+  entrySettingsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  entrySettingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  entrySettingText: {
+    fontSize: 11,
     fontWeight: "500",
   },
   entryFooter: {

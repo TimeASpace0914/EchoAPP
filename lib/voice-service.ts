@@ -76,11 +76,15 @@ export interface HistoryEntry {
   createdAt: number;
   /** 是否為真實語音克隆 */
   isRealVoice?: boolean;
+  /** 生成時使用的情緒設定 */
+  emotion?: string;
+  /** 生成時使用的語速設定 */
+  speed?: number;
 }
 
 /** 支援的音檔格式 */
 export const SUPPORTED_AUDIO_EXTENSIONS = [
-  "mp3", "wav", "m4a", "aac", "flac", "ogg", "wma",
+  "mp3", "wav", "m4a", "flac", "ogg", "wma",
 ];
 
 /** 支援的影片格式（保留匯出以避免破壞其他模組） */

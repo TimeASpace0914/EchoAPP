@@ -49,6 +49,8 @@ const MAPPING = {
   "arrow.triangle.2.circlepath": "autorenew",
   "checkmark.circle.fill": "check-circle",
   "xmark.circle": "cancel",
+  "heart.text.square": "favorite",
+  "gauge.with.dots.needle.67percent": "speed",
 } as unknown as IconMapping;
 
 /**
