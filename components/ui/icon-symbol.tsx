@@ -47,6 +47,8 @@ const MAPPING = {
   "gobackward.10": "replay-10",
   "goforward.10": "forward-10",
   "arrow.triangle.2.circlepath": "autorenew",
+  "checkmark.circle.fill": "check-circle",
+  "xmark.circle": "cancel",
 } as unknown as IconMapping;
 
 /**

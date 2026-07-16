@@ -32,8 +32,21 @@ import {
   type HistoryEntry,
 } from "@/lib/voice-service";
 import { generationStore, type GenerationState } from "@/lib/generation-store";
+import Slider from "@react-native-community/slider";
 
 const MAX_TEXT_LENGTH = 500;
+
+/** 情緒選項（對應 Voicebox instruct 中的情緒描述） */
+const EMOTION_OPTIONS = [
+  { label: "溫柔", value: "溫柔關懷的語氣" },
+  { label: "開心", value: "開心愉快的語氣" },
+  { label: "平靜", value: "平靜安穩的語氣" },
+  { label: "關心", value: "關心牽掛的語氣" },
+  { label: "緩慢", value: "緩慢柔和的語氣" },
+  { label: "慈祥", value: "慈祥温暖的語氣" },
+  { label: "思念", value: "思念威傷的語氣" },
+  { label: "鼓勵", value: "鼓勵振奮的語氣" },
+] as const;
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -53,6 +66,8 @@ export default function HomeScreen() {
   const [voiceDescription, setVoiceDescription] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
+  const [speed, setSpeed] = useState(1.0);
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
 
   // 訂閱 generationStore 狀態變化
@@ -189,6 +204,8 @@ export default function HomeScreen() {
         language: "zh",
         instruct: personality.trim() || undefined,
         description: voiceDescription.trim() || undefined,
+        speed: speed !== 1.0 ? speed : undefined,
+        emotion: selectedEmotion || undefined,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -245,7 +262,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, speed, selectedEmotion]);
 
   // 生成計時器
   useEffect(() => {
@@ -542,6 +559,65 @@ export default function HomeScreen() {
               <Text style={[styles.personalityCounter, { color: colors.muted }]}>
                 {personality.length}/100（可選）
               </Text>
+
+              {/* 語速控制 */}
+              <Text style={[styles.emotionSectionLabel, { color: colors.foreground }]}>
+                語速調整
+              </Text>
+              <View style={styles.speedControlBox}>
+                <Text style={[styles.speedLabel, { color: colors.muted }]}>慢</Text>
+                <Text style={[styles.speedValue, { color: colors.primary }]}>
+                  {speed.toFixed(1)}x
+                </Text>
+                <Text style={[styles.speedLabel, { color: colors.muted }]}>快</Text>
+              </View>
+              <View style={styles.speedSliderWrap}>
+                <Slider
+                  style={{ width: "100%", height: 40 }}
+                  minimumValue={0.5}
+                  maximumValue={2.0}
+                  step={0.1}
+                  value={speed}
+                  onValueChange={setSpeed}
+                  minimumTrackTintColor={colors.primary}
+                  maximumTrackTintColor={colors.border}
+                  thumbTintColor={colors.primary}
+                />
+              </View>
+
+              {/* 情緒選擇 */}
+              <Text style={[styles.emotionSectionLabel, { color: colors.foreground }]}>
+                情緒設定
+              </Text>
+              <View style={styles.emotionSelectorRow}>
+                {EMOTION_OPTIONS.map((emo) => {
+                  const isSelected = selectedEmotion === emo.value;
+                  return (
+                    <TouchableOpacity
+                      key={emo.value}
+                      onPress={() => {
+                        setSelectedEmotion(isSelected ? null : emo.value);
+                      }}
+                      style={[
+                        styles.emotionChip,
+                        {
+                          backgroundColor: isSelected ? colors.primary : colors.background,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.emotionChipText,
+                          { color: isSelected ? "#FFFFFF" : colors.foreground },
+                        ]}
+                      >
+                        {emo.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           )}
         </View>
@@ -588,16 +664,12 @@ export default function HomeScreen() {
                 語音生成約需 2-4 分鐘，可離開此頁面
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => {
-                setIsGenerating(false);
-                setGenProgress(0);
-                setGenStage("");
-              }}
-              style={[styles.dismissButton, { borderColor: colors.border, marginTop: 12, alignSelf: "center" }]}
-            >
-              <Text style={[styles.dismissButtonText, { color: colors.muted }]}>先離開，完成後通知我</Text>
-            </TouchableOpacity>
+            <View style={styles.backgroundHintBox}>
+              <IconSymbol name="info.circle" size={12} color={colors.muted} />
+              <Text style={[styles.backgroundHintText, { color: colors.muted }]}>
+                生成過程中可離開此頁面，完成後將會通知您
+              </Text>
+            </View>
           </View>
         ) : genStoreState.status === "completed" && genStoreState.resultUri && !isGenerating ? (
           <View style={[styles.generatingCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -1129,5 +1201,64 @@ const styles = StyleSheet.create({
   dismissButtonText: {
     fontSize: 14,
     fontWeight: "500",
+  },
+  backgroundHintBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.04)",
+  },
+  backgroundHintText: {
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  speedControlBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: 8,
+  },
+  speedLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    flexShrink: 0,
+  },
+  speedValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    minWidth: 40,
+    textAlign: "right",
+  },
+  speedSliderWrap: {
+    width: "100%",
+    marginTop: 4,
+  },
+  emotionSelectorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  emotionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  emotionChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  emotionSectionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 2,
   },
 });

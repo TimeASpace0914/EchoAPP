@@ -30,10 +30,39 @@ import {
 
 async function handleDownloadEntry(entry: HistoryEntry) {
   try {
-    const fileName = `迴響_${entry.title || formatTimestamp(entry.createdAt).replace(/[^\d]/g, "")}.wav`;
+    const defaultName = `迴響_${entry.title || formatTimestamp(entry.createdAt).replace(/[^\d]/g, "")}`;
+    // 使用 prompt 讓用戶自訂檔名（iOS/Android 原生 prompt）
+    const customName = await new Promise<string | null>((resolve) => {
+      Alert.prompt(
+        "儲存音檔",
+        "輸入檔名（不需包含副檔名）",
+        [
+          { text: "取消", onPress: () => resolve(null) },
+          { text: "儲存", onPress: (text?: string) => resolve(text || defaultName) },
+          { text: "儲存並分享", onPress: (text?: string) => resolve(`SHARE:${text || defaultName}`) },
+        ],
+        "plain-text",
+        defaultName,
+      );
+    });
+    if (!customName) return;
+    const isShare = customName.startsWith("SHARE:");
+    const fileName = `${isShare ? customName.slice(6) : customName}.wav`;
     const result = await saveAudioToDevice(entry.audioUri, fileName);
     if (result.success) {
-      Alert.alert("下載完成", "音檔已儲存至手機媒體庫");
+      if (isShare) {
+        if (Platform.OS === "web" && !(await Sharing.isAvailableAsync())) {
+          Alert.alert("下載完成", `音檔「${fileName}」已儲存，但此平台不支援分享功能`);
+          return;
+        }
+        await Sharing.shareAsync(entry.audioUri, {
+          dialogTitle: "分享親友的聲音",
+          mimeType: "audio/wav",
+          UTI: "com.microsoft.waveform",
+        });
+      } else {
+        Alert.alert("下載完成", `音檔「${fileName}」已儲存至手機媒體庫`);
+      }
     } else {
       Alert.alert("下載失敗", result.error || "無法下載此音檔");
     }

@@ -272,3 +272,19 @@
 - [x] 修正下載檔案：使用 expo-media-library saveToLibraryAsync 存到手機媒體庫
 - [x] result.tsx 和 history.tsx 下載邏輯改用 saveAudioToDevice
 - [x] _layout.tsx 加入 expo-notifications 初始化設定
+
+## 第三十一輪需求（語速情緒 + 台灣口吻 + 懸浮小工具 + 自訂檔名 + 分享）
+
+- [x] 加入語速調整 Slider（0.5x-2.0x）到個性設定卡片
+- [x] 加入情緒選擇 chips（溫柔/開心/平靜/關心/緩慢/慈祥/思念/鼓勵）
+- [x] 台灣口吻優化：在 instruct 中自動加入台灣國語語助詞提示
+- [x] 移除「先離開」按鈕，改為純提示文字
+- [x] 建立全域懸浮進度小工具 FloatingGenerationWidget
+- [x] 在 _layout.tsx 中全域掛載懸浮小工具
+- [x] 加入 checkmark.circle.fill 和 xmark.circle icon 映射
+- [x] result.tsx 下載加入自訂檔名 Modal（含 .wav 副檔名提示）
+- [x] result.tsx 加入「儲存並分享到社群」按鈕
+- [x] history.tsx 下載加入 Alert.prompt 自訂檔名和「儲存並分享」選項
+- [x] 安裝 @react-native-community/slider 套件
+- [x] TypeScript 0 errors
+- [x] Dev server 正常運行

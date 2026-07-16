@@ -49,6 +49,8 @@ export default function ResultScreen() {
   const [titleInput, setTitleInput] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [customFileName, setCustomFileName] = useState("");
 
   const player = useAudioPlayer({ uri: params.audioUri });
   const status = useAudioPlayerStatus(player);
@@ -128,13 +130,26 @@ export default function ResultScreen() {
     : currentTime;
 
   const handleDownload = useCallback(async () => {
+    // 開啟自訂檔名 Modal
+    const defaultName = `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}`;
+    setCustomFileName(defaultName);
+    setShowDownloadModal(true);
+  }, [params.createdAt]);
+
+  const handleDownloadConfirm = useCallback(async () => {
     if (isDownloading) return;
+    const trimmed = customFileName.trim();
+    if (!trimmed) {
+      Alert.alert("提醒", "請輸入檔名");
+      return;
+    }
     setIsDownloading(true);
     try {
-      const fileName = `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}.wav`;
+      const fileName = `${trimmed}.wav`;
       const result = await saveAudioToDevice(params.audioUri, fileName);
       if (result.success) {
-        Alert.alert("下載完成", "音檔已儲存至手機媒體庫");
+        Alert.alert("下載完成", `音檔「${fileName}」已儲存至手機媒體庫`);
+        setShowDownloadModal(false);
       } else {
         Alert.alert("下載失敗", result.error || "無法下載此音檔，請重試");
       }
@@ -143,7 +158,42 @@ export default function ResultScreen() {
     } finally {
       setIsDownloading(false);
     }
-  }, [params.audioUri, params.createdAt, isDownloading]);
+  }, [params.audioUri, customFileName, isDownloading]);
+
+  const handleDownloadAndShare = useCallback(async () => {
+    if (isDownloading) return;
+    const trimmed = customFileName.trim();
+    if (!trimmed) {
+      Alert.alert("提醒", "請輸入檔名");
+      return;
+    }
+    setIsDownloading(true);
+    try {
+      const fileName = `${trimmed}.wav`;
+      const result = await saveAudioToDevice(params.audioUri, fileName);
+      if (result.success) {
+        setShowDownloadModal(false);
+        // 直接開啟分享對話框
+        if (Platform.OS === "web") {
+          if (!(await Sharing.isAvailableAsync())) {
+            Alert.alert("下載完成", `音檔「${fileName}」已儲存，但此平台不支援分享功能`);
+            return;
+          }
+        }
+        await Sharing.shareAsync(params.audioUri, {
+          dialogTitle: "分享親友的聲音",
+          mimeType: "audio/wav",
+          UTI: "com.microsoft.waveform",
+        });
+      } else {
+        Alert.alert("下載失敗", result.error || "無法下載此音檔，請重試");
+      }
+    } catch {
+      Alert.alert("操作失敗", "無法完成此操作，請重試");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [params.audioUri, customFileName, isDownloading]);
 
   const handleShare = useCallback(async () => {
     if (isSharing) return;
@@ -464,6 +514,64 @@ export default function ResultScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* 下載檔名 Modal */}
+      <Modal
+        visible={showDownloadModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDownloadModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>儲存音檔</Text>
+            <Text style={[styles.modalHint, { color: colors.muted }]}>
+              為這段語音取一個檔名，方便日後找到它
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, flex: 1 }]}
+                value={customFileName}
+                onChangeText={setCustomFileName}
+                placeholder="輸入檔名"
+                placeholderTextColor={colors.muted}
+                maxLength={30}
+                autoFocus
+                returnKeyType="done"
+              />
+              <Text style={{ fontSize: 15, color: colors.muted, flexShrink: 0 }}>.wav</Text>
+            </View>
+            <View style={[styles.modalButtons, { flexDirection: "column", gap: 8 }]}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setShowDownloadModal(false)}
+                  style={[styles.modalButton, { borderColor: colors.border, flex: 1 }]}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleDownloadConfirm}
+                  disabled={isDownloading}
+                  style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1, opacity: isDownloading ? 0.6 : 1 }]}
+                >
+                  <Text style={styles.modalButtonTextActive}>
+                    {isDownloading ? "儲存中..." : "儲存到手機"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={handleDownloadAndShare}
+                disabled={isDownloading}
+                style={[styles.modalButton, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1.5, opacity: isDownloading ? 0.6 : 1 }]}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.primary, fontWeight: "600" }]}>
+                  {isDownloading ? "處理中..." : "儲存並分享到社群"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 命名編輯 Modal */}
       <Modal

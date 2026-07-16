@@ -40,6 +40,10 @@ export interface VoiceGenerationParams {
   instruct?: string;
   /** 引擎選擇（qwen/f5等，可選） */
   engine?: string;
+  /** 語速（0.5-2.0，1.0 為正常速度） */
+  speed?: number;
+  /** 情緒標籤（溫柔/開心/平靜/關心/緩慢/慈祥/思念/鼓勵等） */
+  emotion?: string;
   /** 隨機種子（固定種子可重現相同結果） */
   seed?: number;
   /** 參考音檔的轉錄文字（若已知，否則後端自動轉錄） */
@@ -296,7 +300,7 @@ async function restUploadProfile(
 async function restGenerateSpeech(
   text: string,
   profileId: string,
-  options?: { language?: string; instruct?: string; engine?: string; seed?: number },
+  options?: { language?: string; instruct?: string; engine?: string; speed?: number; seed?: number },
 ): Promise<{ audioBase64: string; duration: number | null; storageUrl: string | null }> {
   const apiBase = getApiBaseUrl();
   let response: Response;
@@ -312,6 +316,7 @@ async function restGenerateSpeech(
         ...(options?.language && { language: options.language }),
         ...(options?.instruct && { instruct: options.instruct }),
         ...(options?.engine && { engine: options.engine }),
+        ...(options?.speed !== undefined && { speed: options.speed }),
         ...(options?.seed !== undefined && { seed: options.seed }),
       }),
       signal: createTimeoutSignal(600000),
@@ -472,10 +477,24 @@ export async function generateSpeech(
   }, 4000);
   // 使用 qwen 引擎（Qwen-TTS 語音克隆效果最佳，能仿製聲音特徵）
   // 關鍵：確保 reference_text 是真實轉錄而非假文字，避免胡言亂語
+  // 台灣口吻優化：在 instruct 中加入台灣國語語助詞提示
+  let finalInstruct = params.instruct || "";
+  if (params.emotion) {
+    finalInstruct = finalInstruct
+      ? `${finalInstruct}、${params.emotion}`
+      : params.emotion;
+  }
+  // 加入台灣口吻提示，讓語助詞更自然
+  const taiwanHint = "使用台灣國語口吻，語助詞如喔、欸、耶、啦要自然貼近台灣人說話習慣";
+  finalInstruct = finalInstruct
+    ? `${finalInstruct}。${taiwanHint}`
+    : taiwanHint;
+
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
-    instruct: params.instruct,
+    instruct: finalInstruct,
     engine: params.engine || "qwen",
+    speed: params.speed,
     seed: params.seed,
   });
 
