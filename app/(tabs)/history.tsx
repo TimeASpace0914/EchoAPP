@@ -501,7 +501,8 @@ const styles = StyleSheet.create({
   },
   filterBar: {
     borderBottomWidth: 0.5,
-    maxHeight: 50,
+    maxHeight: 56,
+    flexShrink: 0,
   },
   filterContent: {
     paddingHorizontal: 16,

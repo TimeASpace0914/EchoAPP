@@ -46,6 +46,8 @@ const EMOTION_OPTIONS = [
   { label: "慈祥", value: "慈祥温暖的語氣" },
   { label: "思念", value: "思念威傷的語氣" },
   { label: "鼓勵", value: "鼓勵振奮的語氣" },
+  { label: "激昂", value: "激昂熱血的語氣" },
+  { label: "生氣", value: "生氣慣怒的語氣" },
 ] as const;
 
 export default function HomeScreen() {
@@ -501,27 +503,26 @@ export default function HomeScreen() {
           {showAdvanced && (
             <View style={styles.personalityBody}>
               <Text style={[styles.personalityHint, { color: colors.muted }]}>
-                描述希望親友說話時的語氣與情感，或點選下方標籤快速帶入
+                選擇情緒標籤或自行描述希望親友說話時的語氣與情感
               </Text>
-              {/* 預設情緒標籤 */}
-              <View style={styles.emotionTagsRow}>
-                {EMOTION_PRESETS.map((tag) => {
-                  const isSelected = personality.includes(tag);
+              {/* 情緒標籤 */}
+              <View style={styles.emotionSelectorRow}>
+                {EMOTION_OPTIONS.map((emo) => {
+                  const isSelected = selectedEmotion === emo.value;
                   return (
                     <TouchableOpacity
-                      key={tag}
+                      key={emo.value}
                       onPress={() => {
-                        if (isSelected) {
-                          setPersonality(prev => prev.replace(new RegExp(tag + "[、，,\\s]*", "g"), "").trim());
-                        } else {
+                        setSelectedEmotion(isSelected ? null : emo.value);
+                        if (!isSelected && !personality.includes(emo.label)) {
                           setPersonality(prev => {
-                            const next = prev ? `${prev}、${tag}` : tag;
+                            const next = prev ? `${prev}、${emo.value}` : emo.value;
                             return next.slice(0, 100);
                           });
                         }
                       }}
                       style={[
-                        styles.emotionTag,
+                        styles.emotionChip,
                         {
                           backgroundColor: isSelected ? colors.primary : colors.background,
                           borderColor: isSelected ? colors.primary : colors.border,
@@ -530,11 +531,11 @@ export default function HomeScreen() {
                     >
                       <Text
                         style={[
-                          styles.emotionTagText,
+                          styles.emotionChipText,
                           { color: isSelected ? "#FFFFFF" : colors.foreground },
                         ]}
                       >
-                        {tag}
+                        {emo.label}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -551,7 +552,7 @@ export default function HomeScreen() {
                 ]}
                 value={personality}
                 onChangeText={setPersonality}
-                placeholder="例如：溫柔、緩慢、像在跟家人聊天"
+                placeholder="例如：像在跟家人聊天，語助詞要自然"
                 placeholderTextColor={colors.muted}
                 multiline
                 maxLength={100}
@@ -585,40 +586,6 @@ export default function HomeScreen() {
                   maximumTrackTintColor={colors.border}
                   thumbTintColor={colors.primary}
                 />
-              </View>
-
-              {/* 情緒選擇 */}
-              <Text style={[styles.emotionSectionLabel, { color: colors.foreground }]}>
-                情緒設定
-              </Text>
-              <View style={styles.emotionSelectorRow}>
-                {EMOTION_OPTIONS.map((emo) => {
-                  const isSelected = selectedEmotion === emo.value;
-                  return (
-                    <TouchableOpacity
-                      key={emo.value}
-                      onPress={() => {
-                        setSelectedEmotion(isSelected ? null : emo.value);
-                      }}
-                      style={[
-                        styles.emotionChip,
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.background,
-                          borderColor: isSelected ? colors.primary : colors.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.emotionChipText,
-                          { color: isSelected ? "#FFFFFF" : colors.foreground },
-                        ]}
-                      >
-                        {emo.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
               </View>
             </View>
           )}
