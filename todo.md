@@ -288,3 +288,13 @@
 - [x] 安裝 @react-native-community/slider 套件
 - [x] TypeScript 0 errors
 - [x] Dev server 正常運行
+
+## 第三十二輪需求（UI 修復：灰條 + 情緒多選 + 存檔檔名）
+
+- [x] 修復首頁上方灰條（移除 _layout.tsx 強制 top inset 16px，改用真實 device insets）
+- [x] 情緒 chips 字體放大（fontSize 13→16，fontWeight 500→600，padding 加大）
+- [x] 情緒改為多選（selectedEmotions 陣列，選取過的都會亮起來）
+- [x] 存檔時檔名直接讀取回憶庫命名的標題（entryTitle 優先於時間戳）
+- [x] 結果頁載入時自動讀取回憶庫標題和標籤
+- [x] TypeScript 0 errors
+- [x] Dev server 正常運行

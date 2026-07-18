@@ -27,6 +27,7 @@ import {
   formatTimestamp,
   formatDuration,
   updateHistoryEntry,
+  getHistory,
 } from "@/lib/voice-service";
 
 export default function ResultScreen() {
@@ -51,6 +52,7 @@ export default function ResultScreen() {
   const [isSharing, setIsSharing] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [customFileName, setCustomFileName] = useState("");
+  const [entryTitle, setEntryTitle] = useState("");
 
   const player = useAudioPlayer({ uri: params.audioUri });
   const status = useAudioPlayerStatus(player);
@@ -63,6 +65,22 @@ export default function ResultScreen() {
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true });
   }, []);
+
+  // 載入回憶庫中此筆記錄的標題，用於存檔預設檔名
+  useEffect(() => {
+    if (params.entryId) {
+      getHistory().then(entries => {
+        const entry = entries.find(e => e.id === params.entryId);
+        if (entry?.title) {
+          setEntryTitle(entry.title);
+          setTitle(entry.title);
+        }
+        if (entry?.tags) {
+          setTags(entry.tags);
+        }
+      }).catch(() => {});
+    }
+  }, [params.entryId]);
 
   const isPlaying = status.playing;
   const currentTime = status.currentTime;
@@ -130,11 +148,13 @@ export default function ResultScreen() {
     : currentTime;
 
   const handleDownload = useCallback(async () => {
-    // 開啟自訂檔名 Modal
-    const defaultName = `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}`;
+    // 預設檔名優先使用回憶庫標題，其次用時間戳
+    const defaultName = entryTitle
+      ? entryTitle
+      : `迴響_${formatTimestamp(Number(params.createdAt)).replace(/[^\d]/g, "")}`;
     setCustomFileName(defaultName);
     setShowDownloadModal(true);
-  }, [params.createdAt]);
+  }, [params.createdAt, entryTitle]);
 
   const handleDownloadConfirm = useCallback(async () => {
     if (isDownloading) return;

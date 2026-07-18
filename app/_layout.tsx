@@ -91,15 +91,15 @@ export default function RootLayout() {
   );
   const [trpcClient] = useState(() => createTRPCClient());
 
-  // Ensure minimum 8px padding for top and bottom on mobile
+  // Use real device insets; ScreenContainer handles SafeArea padding
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
     return {
       ...metrics,
       insets: {
         ...metrics.insets,
-        top: Math.max(metrics.insets.top, 16),
-        bottom: Math.max(metrics.insets.bottom, 12),
+        top: metrics.insets.top,
+        bottom: metrics.insets.bottom,
       },
     };
   }, [initialInsets, initialFrame]);

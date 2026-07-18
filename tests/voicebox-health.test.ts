@@ -30,6 +30,6 @@ describe("Voicebox health endpoint", () => {
     // This verifies the secret was properly configured
     const voiceboxUrl = process.env.VOICEBOX_URL;
     expect(voiceboxUrl).toBeDefined();
-    expect(voiceboxUrl).toContain("ngrok-free.dev");
+    expect(voiceboxUrl).toContain("echo-voice.cc");
   });
 });

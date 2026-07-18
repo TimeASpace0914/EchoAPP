@@ -69,7 +69,7 @@ export default function HomeScreen() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
   const [speed, setSpeed] = useState(1.0);
-  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
 
   // 訂閱 generationStore 狀態變化
@@ -207,7 +207,7 @@ export default function HomeScreen() {
         instruct: personality.trim() || undefined,
         description: voiceDescription.trim() || undefined,
         speed: speed !== 1.0 ? speed : undefined,
-        emotion: selectedEmotion || undefined,
+        emotion: selectedEmotions.length > 0 ? selectedEmotions.join("、") : undefined,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -223,7 +223,7 @@ export default function HomeScreen() {
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
-        emotion: selectedEmotion || undefined,
+        emotion: selectedEmotions.length > 0 ? selectedEmotions.join("、") : undefined,
         speed: speed !== 1.0 ? speed : undefined,
       };
       await saveHistoryEntry(entry);
@@ -266,7 +266,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, speed, selectedEmotion]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, speed, selectedEmotions]);
 
   // 生成計時器
   useEffect(() => {
@@ -508,18 +508,19 @@ export default function HomeScreen() {
               {/* 情緒標籤 */}
               <View style={styles.emotionSelectorRow}>
                 {EMOTION_OPTIONS.map((emo) => {
-                  const isSelected = selectedEmotion === emo.value;
+                  const isSelected = selectedEmotions.includes(emo.value);
                   return (
                     <TouchableOpacity
                       key={emo.value}
                       onPress={() => {
-                        setSelectedEmotion(isSelected ? null : emo.value);
-                        if (!isSelected && !personality.includes(emo.label)) {
-                          setPersonality(prev => {
-                            const next = prev ? `${prev}、${emo.value}` : emo.value;
-                            return next.slice(0, 100);
-                          });
+                        if (Platform.OS !== "web") {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }
+                        setSelectedEmotions(prev =>
+                          isSelected
+                            ? prev.filter(v => v !== emo.value)
+                            : [...prev, emo.value]
+                        );
                       }}
                       style={[
                         styles.emotionChip,
@@ -1215,14 +1216,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emotionChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 18,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   emotionChipText: {
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: 16,
+    fontWeight: "600",
   },
   emotionSectionLabel: {
     fontSize: 12,
