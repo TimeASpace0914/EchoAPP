@@ -38,16 +38,16 @@ const MAX_TEXT_LENGTH = 500;
 
 /** 情緒選項（對應 Voicebox instruct 中的情緒描述） */
 const EMOTION_OPTIONS = [
-  { label: "溫柔", value: "溫柔關懷的語氣" },
-  { label: "開心", value: "開心愉快的語氣" },
-  { label: "平靜", value: "平靜安穩的語氣" },
-  { label: "關心", value: "關心牽掛的語氣" },
-  { label: "緩慢", value: "緩慢柔和的語氣" },
-  { label: "慈祥", value: "慈祥温暖的語氣" },
-  { label: "思念", value: "思念威傷的語氣" },
-  { label: "鼓勵", value: "鼓勵振奮的語氣" },
-  { label: "激昂", value: "激昂熱血的語氣" },
-  { label: "生氣", value: "生氣慣怒的語氣" },
+  { label: "溫柔", value: "用非常溫柔深情、充滿關懷的語氣，語調柔和到極致，像在輕撫對方的臉龐" },
+  { label: "開心", value: "用非常開心興奮、充滿喜悅的語氣，語調高昂明亮，像中了彩票一樣快樂" },
+  { label: "平靜", value: "用非常平靜安穩、沉澱內斂的語氣，語調如止水般寧靜，像在深夜獨坐沉思" },
+  { label: "關心", value: "用非常關心牽掛、充滿擔憂的語氣，語調急切而真摯，像久別重逢的家人" },
+  { label: "緩慢", value: "用非常緩慢柔和、拖長音的語氣，每個字都像在細細品味，像在哄孩子入睡" },
+  { label: "慈祥", value: "用非常慈祥温暖、充滿長輩慈愛的語氣，語調渾厚而包容，像爺爺奶奶在說故事" },
+  { label: "思念", value: "用非常思念哀傷、充滿不捨的語氣，語調低沉顫抖，像在靈前懷念逝者" },
+  { label: "鼓勵", value: "用非常鼓勵振奮、充滿力量的語氣，語調鏗鏘有力，像教練在比賽前激勵選手" },
+  { label: "激昂", value: "用非常激昂熱血、充滿激情的語氣，語調高亢激烈，像在群眾面前演講" },
+  { label: "生氣", value: "用非常生氣憤怒、充滿壓迫感的語氣，語調低沉而危險，像在質問背叛者" },
 ] as const;
 
 export default function HomeScreen() {
@@ -1216,14 +1216,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emotionChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
   },
   emotionChipText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "500",
   },
   emotionSectionLabel: {
     fontSize: 12,

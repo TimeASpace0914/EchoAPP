@@ -484,9 +484,11 @@ export async function generateSpeech(
   // 台灣口吻優化：在 instruct 中加入台灣國語語助詞提示
   let finalInstruct = params.instruct || "";
   if (params.emotion) {
+    // 強化情緒表達：明確要求 AI 放大情緒波動
+    const emotionBoost = `【情緒要求】${params.emotion}。請務必嚴格遵守此情緒設定，讓語調起伏、語速變化、停頓和呼吸都充分展現此情緒，不要平淡唸讀，要像真人一樣帶有強烈的情感波動`;
     finalInstruct = finalInstruct
-      ? `${finalInstruct}、${params.emotion}`
-      : params.emotion;
+      ? `${finalInstruct}。${emotionBoost}`
+      : emotionBoost;
   }
   // 加入台灣口吻提示，讓語助詞更自然
   const taiwanHint = "使用台灣國語口吻，語助詞如喔、欸、耶、啦要自然貼近台灣人說話習慣";
