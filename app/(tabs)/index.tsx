@@ -578,8 +578,8 @@ export default function HomeScreen() {
               <View style={styles.speedSliderWrap}>
                 <Slider
                   style={{ width: "100%", height: 40 }}
-                  minimumValue={0.5}
-                  maximumValue={2.0}
+                  minimumValue={0}
+                  maximumValue={2}
                   step={0.1}
                   value={speed}
                   onValueChange={setSpeed}
