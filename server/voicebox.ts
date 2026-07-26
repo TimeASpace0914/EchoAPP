@@ -75,7 +75,7 @@ const NGROK_HEADERS = { "ngrok-skip-browser-warning": "true" };
  * 使用 Voicebox 的 /transcribe 端點自動轉錄音檔，取得真實 reference_text
  * 這是解決「胡言亂語」問題的關鍵：假的 reference_text 會被 AI 當成要說的內容
  */
-async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string | null> {
+async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt?: string): Promise<string | null> {
   const baseUrl = getVoiceboxUrl();
   const boundary = `----TranscribeBoundary${Date.now()}`;
   const ext = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : "m4a";
@@ -87,13 +87,28 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
     `Content-Type: ${mimeType}\r\n\r\n`
   );
   const fileFooter = Buffer.from("\r\n");
-  const textPart = Buffer.from(
+  const parts: Buffer[] = [fileHeader, audioBuffer, fileFooter];
+
+  // language part
+  parts.push(Buffer.from(
     `--${boundary}\r\n` +
     `Content-Disposition: form-data; name="language"\r\n\r\n` +
     `zh\r\n`
-  );
+  ));
+
+  // prompt part — 提供上下文給 Whisper 幫助識別中文人名和專有名詞
+  if (hintPrompt && hintPrompt.trim().length > 0) {
+    parts.push(Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="prompt"\r\n\r\n` +
+      `${hintPrompt.trim()}\r\n`
+    ));
+    console.log(`[Voicebox] Transcribe with hint prompt: "${hintPrompt.substring(0, 60)}"`);
+  }
+
   const endBoundary = Buffer.from(`--${boundary}--\r\n`);
-  const multipartBody = Buffer.concat([fileHeader, audioBuffer, fileFooter, textPart, endBoundary]);
+  parts.push(endBoundary);
+  const multipartBody = Buffer.concat(parts);
 
   try {
     console.log(`[Voicebox] Transcribing audio for real reference_text (${audioBuffer.length} bytes)...`);
@@ -309,7 +324,10 @@ export async function uploadVoiceProfile(
     // 若沒有提供真實的 reference_text，用 Voicebox 自動轉錄
     if (!actualReferenceText) {
       console.log(`[Voicebox] No reference_text provided, auto-transcribing audio...`);
-      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType);
+      // 用 profile 名稱和描述作為 Whisper 的 prompt 提示，幫助識別人名和專有名詞
+      const hintParts = [name, description].filter((s) => s && s.trim().length > 0);
+      const hintPrompt = hintParts.length > 0 ? hintParts.join("，") : undefined;
+      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType, hintPrompt);
       // 若轉錄也失敗，用最小化的通用文字（不會被 AI 當成要說的內容）
       if (!actualReferenceText) {
         actualReferenceText = '嗯';

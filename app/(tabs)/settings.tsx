@@ -192,9 +192,6 @@ export default function SettingsScreen() {
             </View>
             <Text style={[styles.stepTitle, { color: colors.foreground }]}>{step.title}</Text>
             <Text style={[styles.stepDesc, { color: colors.foreground }]}>{step.desc}</Text>
-            {index < steps.length - 1 && (
-              <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
-            )}
           </View>
         ))}
 

@@ -405,7 +405,7 @@ export default function ResultScreen() {
                 <IconSymbol
                   name={isPlaying ? "pause.fill" : "play.fill"}
                   size={36}
-                  color="#FFFFFF"
+                  color={colors.background}
                 />
               </TouchableOpacity>
 
@@ -587,7 +587,7 @@ export default function ResultScreen() {
                   activeOpacity={0.7}
                   style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1, opacity: isDownloading ? 0.6 : 1 }]}
                 >
-                  <Text style={styles.modalButtonTextActive}>
+                  <Text style={[styles.modalButtonTextActive, { color: colors.background }]}>
                     {isDownloading ? "儲存中..." : "儲存到手機"}
                   </Text>
                 </TouchableOpacity>
@@ -644,7 +644,7 @@ export default function ResultScreen() {
                 activeOpacity={0.7}
                 style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
-                <Text style={styles.modalButtonTextActive}>儲存</Text>
+                <Text style={[styles.modalButtonTextActive, { color: colors.background }]}>儲存</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -732,7 +732,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   sourceDot: {
     width: 8,
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   },
   waveCard: {
     width: "100%",
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 28,
     alignItems: "center",
     gap: 20,
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
   playButton: {
     width: 64,
     height: 64,
-    borderRadius: 14,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     shadowOffset: { width: 0, height: 2 },
@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 76,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
     gap: 8,
     shadowOffset: { width: 0, height: 1 },
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
   },
   nameTagCard: {
     width: "100%",
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 20,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
   },
   tagText: {
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderStyle: "dashed",
   },
@@ -917,7 +917,7 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     width: "100%",
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 20,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    borderRadius: 14,
+    borderRadius: 20,
     padding: 24,
     gap: 12,
   },
@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modalInput: {
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -977,7 +977,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
   },
@@ -986,7 +986,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   modalButtonTextActive: {
-    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
   },
