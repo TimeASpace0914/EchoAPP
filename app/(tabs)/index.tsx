@@ -523,6 +523,15 @@ export default function HomeScreen() {
           <Text style={[styles.charCounter, { color: colors.muted }]}>
             {text.length}/{MAX_TEXT_LENGTH}
           </Text>
+          {/* 發音提示說明 */}
+          <View style={[styles.pronunciationHintBox, { backgroundColor: `${colors.muted}08`, borderColor: colors.border }]}>
+            <View style={styles.pronunciationHintRow}>
+              <IconSymbol name="info.circle" size={13} color={colors.muted} />
+              <Text style={[styles.pronunciationHintText, { color: colors.muted }]}>
+                系統會自動為中文加上拼音提示，修正人名或罕見字的發音問題
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* 個性設定（可選） */}
@@ -1006,6 +1015,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "right",
     marginTop: 8,
+  },
+  pronunciationHintBox: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 0.5,
+  },
+  pronunciationHintRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  pronunciationHintText: {
+    fontSize: 11,
+    lineHeight: 16,
+    flex: 1,
   },
   personalityCard: {
     borderRadius: 20,

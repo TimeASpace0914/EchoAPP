@@ -322,3 +322,13 @@
 - [x] 圓角從 8px 調大到 12-14px（卡片 14、按鈕 12、輸入框/chip 10）
 - [x] 開頭動畫從直線進度條改為波浪圓形動畫（同心圓波紋擴散 + 底部波浪 bar 跳動）
 - [x] TypeScript 0 errors
+
+## 注音提示功能（Phase 2 - 修正中文發音問題）
+
+- [x] 安裝 pinyin-pro 套件（中文轉拼音/注音）
+- [x] 建立 lib/pinyin-helpers.ts 中文拼音提示工具模組
+- [x] 修改 lib/voice-service.ts 在生成語音時自動加入拼音提示到 instruct
+- [x] 修改 app/(tabs)/index.tsx 加入發音提示說明 UI
+- [x] 建立 tests/pinyin-helpers.test.ts 單元測試（14 tests passed）
+- [x] TypeScript 0 errors
+- [x] 重啟 dev server

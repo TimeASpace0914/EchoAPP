@@ -9,6 +9,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { appendPronunciationHint } from "@/lib/pinyin-helpers";
 
 /**
  * 建立帶超時的 AbortSignal（相容舊版裝置不支援 AbortSignal.timeout）
@@ -495,6 +496,10 @@ export async function generateSpeech(
   finalInstruct = finalInstruct
     ? `${finalInstruct}。${taiwanHint}`
     : taiwanHint;
+
+  // 自動加入中文發音提示：偵測文字中的中文字，為罕見字/人名加上拼音標注
+  // 解決 G2P 模型將「蔡承諺」錯誤映射為「蔡懲罰」等發音問題
+  finalInstruct = appendPronunciationHint(finalInstruct, params.text);
 
   const result = await restGenerateSpeech(params.text, voiceProfileId, {
     language: params.language,
