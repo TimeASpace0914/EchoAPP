@@ -318,7 +318,6 @@ export default function ResultScreen() {
           <IconSymbol name="xmark" size={24} color={colors.muted} />
         </TouchableOpacity>
       </View>
-      <WaveDecoration variant="bottom" height={10} opacity={0.06} />
 
       <FlatList
         data={[]}

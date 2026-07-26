@@ -193,7 +193,7 @@ export function SplashOverlay({
 
           {/* LOGO 疊在波紋正中央 */}
           <Animated.View style={[styles.logoWrap, logoAnimatedStyle]}>
-            <Logo height={72} variant={isDark ? "white" : "black"} />
+            <Logo height={110} variant={isDark ? "white" : "black"} />
           </Animated.View>
         </View>
 
@@ -286,6 +286,10 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
   },

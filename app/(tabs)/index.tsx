@@ -304,7 +304,6 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
-      <WaveDecoration variant="bottom" height={10} opacity={0.06} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
