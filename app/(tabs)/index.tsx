@@ -73,6 +73,7 @@ export default function HomeScreen() {
   const [genError, setGenError] = useState<string | null>(null);
   const [personality, setPersonality] = useState("");
   const [voiceDescription, setVoiceDescription] = useState("");
+  const [referenceText, setReferenceText] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
   const [speed, setSpeed] = useState(1.0);
@@ -227,6 +228,7 @@ export default function HomeScreen() {
         language: "zh",
         instruct: personality.trim() || undefined,
         description: voiceDescription.trim() || undefined,
+        referenceText: referenceText.trim() || undefined,
         speed: speed !== 1.0 ? speed : undefined,
         emotion: selectedEmotions.length > 0 ? selectedEmotions.join("、") : undefined,
         onProgress: (progress, stage) => {
@@ -286,7 +288,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, speed, selectedEmotions, isGenerating]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, referenceText, speed, selectedEmotions, isGenerating]);
 
   // 生成計時器
   useEffect(() => {
@@ -402,6 +404,27 @@ export default function HomeScreen() {
                   placeholderTextColor={colors.muted}
                   maxLength={50}
                   returnKeyType="done"
+                />
+              </View>
+
+              {/* 參考文字（重要！） */}
+              <View style={[styles.descriptionBox, { backgroundColor: colors.background, borderColor: colors.border, marginTop: 10 }]}>
+                <Text style={[styles.descriptionLabel, { color: colors.foreground }]}>
+                  音檔內容文字（重要）
+                </Text>
+                <Text style={[styles.descriptionHint, { color: colors.muted }]}>
+                  輸入音檔中實際說的文字，可大幅提升語音克隆精準度，避免人名識別錯誤
+                </Text>
+                <TextInput
+                  style={[styles.descriptionInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground, minHeight: 60 }]}
+                  value={referenceText}
+                  onChangeText={(val) => setReferenceText(val.slice(0, 200))}
+                  placeholder="例如：大家好，我是蔡承諺，今天很高興..."
+                  placeholderTextColor={colors.muted}
+                  maxLength={200}
+                  returnKeyType="done"
+                  multiline
+                  textAlignVertical="top"
                 />
               </View>
 
@@ -938,6 +961,13 @@ const styles = StyleSheet.create({
   descriptionLabel: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  descriptionHint: {
+    fontSize: 11,
+    fontWeight: "400",
+    marginTop: 2,
+    marginBottom: 6,
+    lineHeight: 16,
   },
   descriptionInput: {
     borderRadius: 14,

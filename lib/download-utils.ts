@@ -37,9 +37,13 @@ export async function saveAudioToDevice(
 
     // 確保檔案有正確的副檔名（saveToLibraryAsync 需要副檔名）
     let localUri = audioUri;
+    const tmpPath = `${FileSystem.cacheDirectory}${fileName}`;
     if (!audioUri.endsWith(".wav")) {
       // 複製到暫存目錄並加上 .wav 副檔名
-      const tmpPath = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.copyAsync({ from: audioUri, to: tmpPath });
+      localUri = tmpPath;
+    } else {
+      // 即使已經是 .wav，也複製一份到 cache 確保路徑可存取
       await FileSystem.copyAsync({ from: audioUri, to: tmpPath });
       localUri = tmpPath;
     }
@@ -60,7 +64,16 @@ export async function saveAudioToDevice(
     }
 
     // 儲存到用戶手機媒體庫
-    await MediaLibrary.saveToLibraryAsync(localUri);
+    // 使用 createAsset 而非 saveToLibraryAsync，因為 saveToLibraryAsync 在部分 Android 裝置上
+    // 對音檔的支援不一致。createAsset 會在媒體庫中建立新資產，更可靠。
+    try {
+      const asset = await MediaLibrary.createAssetAsync(localUri);
+      console.log('[download-utils] Asset created:', asset.uri);
+    } catch (createErr) {
+      // createAsset 失敗時退回 saveToLibraryAsync
+      console.warn('[download-utils] createAsset failed, trying saveToLibraryAsync:', createErr);
+      await MediaLibrary.saveToLibraryAsync(localUri);
+    }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     return { success: true, path: "已儲存至手機媒體庫" };

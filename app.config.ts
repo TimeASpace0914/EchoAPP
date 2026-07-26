@@ -112,6 +112,14 @@ const config: ExpoConfig = {
       },
     ],
     [
+      "expo-media-library",
+      {
+        photosPermission: "允許迴響存取你的媒體庫以儲存語音檔案。",
+        savePhotosPermission: "允許迴響將語音檔案儲存至媒體庫。",
+        isAccessMediaLocationEnabled: true,
+      },
+    ],
+    [
       "expo-build-properties",
       {
         android: {
