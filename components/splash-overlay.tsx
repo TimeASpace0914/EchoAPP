@@ -37,6 +37,7 @@ export function SplashOverlay({
 
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.85);
+  const logoTranslateY = useSharedValue(0);
   const overlayOpacity = useSharedValue(1);
   const [isDone, setIsDone] = useState(false);
 
@@ -54,7 +55,10 @@ export function SplashOverlay({
   // ★ 所有 useAnimatedStyle 必須在條件 return 之前呼叫（Rules of Hooks）
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
+    transform: [
+      { scale: logoScale.value },
+      { translateY: logoTranslateY.value },
+    ],
   }));
 
   const ring1Style = useAnimatedStyle(() => ({
@@ -86,6 +90,32 @@ export function SplashOverlay({
       duration: 1200,
       easing: SOFT_OUT,
     });
+
+    // 1b. LOGO 呼吸動畫 — 淡入完成後開始，與波紋節奏同步
+    // 緩慢的 scale 呼吸：1.0 → 1.04 → 1.0，2600ms 一個循環（與波紋循環一致）
+    logoScale.value = withDelay(
+      1000,
+      withRepeat(
+        withSequence(
+          withTiming(1.04, { duration: 1300, easing: SOFT_EASE }),
+          withTiming(1.0, { duration: 1300, easing: SOFT_EASE })
+        ),
+        -1,
+        true
+      )
+    );
+    // 緩慢的上下浮動：0 → -3 → 0，2600ms 一個循環
+    logoTranslateY.value = withDelay(
+      1000,
+      withRepeat(
+        withSequence(
+          withTiming(-3, { duration: 1300, easing: SOFT_EASE }),
+          withTiming(0, { duration: 1300, easing: SOFT_EASE })
+        ),
+        -1,
+        true
+      )
+    );
 
     // 2. 三圈波紋 — 淡入 → 擴散 → 淡出，循環
     // 修正「突然出現」問題：每個循環從 opacity 0 開始柔和淡入，不再用 duration:0 瞬間跳回
@@ -145,6 +175,8 @@ export function SplashOverlay({
       cancelAnimation(ring1Scale);
       cancelAnimation(ring2Scale);
       cancelAnimation(ring3Scale);
+      cancelAnimation(logoScale);
+      cancelAnimation(logoTranslateY);
     };
   }, []);
 
