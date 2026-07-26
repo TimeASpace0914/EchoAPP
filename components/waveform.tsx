@@ -32,7 +32,7 @@ function getSeedHeight(index: number, total: number): number {
 export function Waveform({
   active,
   barCount = 40,
-  color = "#E8A87C",
+  color = "#000000",
   height = 80,
 }: WaveformProps) {
   const seeds = useRef(

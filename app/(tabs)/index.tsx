@@ -21,6 +21,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { Logo } from "@/components/logo";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Waveform } from "@/components/waveform";
+import { WaveDecoration } from "@/components/wave-decoration";
 import { useColors } from "@/hooks/use-colors";
 import {
   generateSpeech,
@@ -303,6 +304,7 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
+      <WaveDecoration variant="bottom" height={10} opacity={0.06} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -761,15 +763,15 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   uploadCard: {
-    borderRadius: 24,
-    borderWidth: 2,
+    borderRadius: 8,
+    borderWidth: 1.5,
     borderStyle: "dashed",
-    padding: 32,
+    padding: 28,
     alignItems: "center",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   uploadPlaceholder: {
     alignItems: "center",
@@ -777,9 +779,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   uploadIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -794,7 +796,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   formatHintBox: {
-    borderRadius: 12,
+    borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -819,8 +821,8 @@ const styles = StyleSheet.create({
   },
   selectButton: {
     paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
     marginTop: 8,
   },
   selectButtonText: {
@@ -834,9 +836,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   audioFileIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -867,15 +869,15 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
     width: "100%",
     marginTop: 4,
   },
   previewPlayButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -893,7 +895,7 @@ const styles = StyleSheet.create({
   changeButton: {
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 6,
     borderWidth: 1,
     marginTop: 4,
   },
@@ -902,7 +904,7 @@ const styles = StyleSheet.create({
   },
   descriptionBox: {
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -914,19 +916,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   descriptionInput: {
-    borderRadius: 10,
+    borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
   },
   textCard: {
-    borderRadius: 24,
+    borderRadius: 8,
     padding: 20,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   textCardTitle: {
     fontSize: 15,
@@ -938,7 +940,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   textInput: {
-    borderRadius: 12,
+    borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -952,12 +954,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   personalityCard: {
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   personalityHeader: {
     flexDirection: "row",
@@ -985,7 +987,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   personalityInput: {
-    borderRadius: 12,
+    borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -998,14 +1000,14 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   generateButton: {
-    borderRadius: 20,
+    borderRadius: 8,
     height: 56,
     alignItems: "center",
     justifyContent: "center",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   generateButtonText: {
     color: "#FFFFFF",
@@ -1028,7 +1030,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.05)",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 6,
   },
   genTimerText: {
     fontSize: 13,
@@ -1054,7 +1056,7 @@ const styles = StyleSheet.create({
   emotionTag: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 6,
     borderWidth: 1,
   },
   emotionTagText: {
@@ -1067,14 +1069,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   generatingCard: {
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 20,
     alignItems: "center",
     gap: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   waveContainer: {
     width: "100%",
@@ -1118,7 +1120,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 6,
   },
   statusDotText: {
     color: "#FFFFFF",
@@ -1127,19 +1129,19 @@ const styles = StyleSheet.create({
   },
   // 錯誤卡片樣式
   errorCard: {
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 28,
     alignItems: "center",
     gap: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   errorIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1155,7 +1157,7 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: "#FFFFFF",
@@ -1165,7 +1167,7 @@ const styles = StyleSheet.create({
   dismissButton: {
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
   },
   dismissButtonText: {
@@ -1179,7 +1181,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 6,
     backgroundColor: "rgba(0,0,0,0.04)",
   },
   backgroundHintText: {
@@ -1218,7 +1220,7 @@ const styles = StyleSheet.create({
   emotionChip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 18,
+    borderRadius: 6,
     borderWidth: 1,
   },
   emotionChipText: {

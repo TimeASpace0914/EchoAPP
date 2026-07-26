@@ -304,3 +304,15 @@
 - [x] 語速滑條範圍從 0.5~2.0 改為 0~2，初始值 1.0 在正中間
 - [x] 左邊顯示「慢」，右邊顯示「快」
 - [x] TypeScript 0 errors
+
+## 第三十四輪需求（UI/UX 黑白風格重設計）
+
+- [x] 主題色彩改為黑白風格（primary 純黑、background 淺灰、foreground 純黑）
+- [x] 所有卡片圓角從 20-24px 縮小為 8px（含按鈕、輸入框、chip 等）
+- [x] 陰影從柔和改為銳利（opacity 降低、radius 縮小）
+- [x] 建立 WaveDecoration 波浪裝飾組件（正弦波 bar 排列）
+- [x] 首頁 navBar 下方加入波浪裝飾元素
+- [x] 結果頁 navBar 下方加入波浪裝飾元素
+- [x] Waveform 組件預設顏色從暖橘改為純黑
+- [x] result.tsx 所有圓角同步縮小
+- [x] TypeScript 0 errors

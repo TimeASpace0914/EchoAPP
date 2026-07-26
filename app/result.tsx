@@ -22,6 +22,7 @@ import { saveAudioToDevice } from "@/lib/download-utils";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Waveform } from "@/components/waveform";
+import { WaveDecoration } from "@/components/wave-decoration";
 import { useColors } from "@/hooks/use-colors";
 import {
   formatTimestamp,
@@ -317,6 +318,7 @@ export default function ResultScreen() {
           <IconSymbol name="xmark" size={24} color={colors.muted} />
         </TouchableOpacity>
       </View>
+      <WaveDecoration variant="bottom" height={10} opacity={0.06} />
 
       <FlatList
         data={[]}
@@ -714,7 +716,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 6,
   },
   sourceDot: {
     width: 8,
@@ -727,14 +729,14 @@ const styles = StyleSheet.create({
   },
   waveCard: {
     width: "100%",
-    borderRadius: 24,
+    borderRadius: 8,
     padding: 28,
     alignItems: "center",
     gap: 20,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   generatedText: {
     fontSize: 16,
@@ -789,15 +791,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   playButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   actionRow: {
     flexDirection: "row",
@@ -806,12 +808,12 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 76,
     paddingVertical: 16,
-    borderRadius: 20,
+    borderRadius: 8,
     alignItems: "center",
     gap: 8,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
   },
   actionLabel: {
@@ -820,12 +822,12 @@ const styles = StyleSheet.create({
   },
   nameTagCard: {
     width: "100%",
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 20,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   nameRow: {
     flexDirection: "row",
@@ -871,7 +873,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 6,
     borderWidth: 1,
   },
   tagText: {
@@ -890,7 +892,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 6,
     borderWidth: 1,
     borderStyle: "dashed",
   },
@@ -899,12 +901,12 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     width: "100%",
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 20,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   infoRow: {
     flexDirection: "row",
@@ -932,7 +934,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    borderRadius: 24,
+    borderRadius: 8,
     padding: 24,
     gap: 12,
   },
@@ -945,7 +947,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modalInput: {
-    borderRadius: 12,
+    borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -959,7 +961,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
   },
