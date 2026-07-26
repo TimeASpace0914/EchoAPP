@@ -45,16 +45,16 @@ const MAX_TEXT_LENGTH = 500;
 
 /** 情緒選項（對應 Voicebox instruct 中的情緒描述） */
 const EMOTION_OPTIONS = [
-  { label: "溫柔", value: "用非常溫柔深情、充滿關懷的語氣，語調柔和到極致，像在輕撫對方的臉龐" },
-  { label: "開心", value: "用非常開心興奮、充滿喜悅的語氣，語調高昂明亮，像中了彩票一樣快樂" },
-  { label: "平靜", value: "用非常平靜安穩、沉澱內斂的語氣，語調如止水般寧靜，像在深夜獨坐沉思" },
-  { label: "關心", value: "用非常關心牽掛、充滿擔憂的語氣，語調急切而真摯，像久別重逢的家人" },
-  { label: "緩慢", value: "用非常緩慢柔和、拖長音的語氣，每個字都像在細細品味，像在哄孩子入睡" },
-  { label: "慈祥", value: "用非常慈祥温暖、充滿長輩慈愛的語氣，語調渾厚而包容，像爺爺奶奶在說故事" },
-  { label: "思念", value: "用非常思念哀傷、充滿不捨的語氣，語調低沉顫抖，像在靈前懷念逝者" },
-  { label: "鼓勵", value: "用非常鼓勵振奮、充滿力量的語氣，語調鏗鏘有力，像教練在比賽前激勵選手" },
-  { label: "激昂", value: "用非常激昂熱血、充滿激情的語氣，語調高亢激烈，像在群眾面前演講" },
-  { label: "生氣", value: "用非常生氣憤怒、充滿壓迫感的語氣，語調低沉而危險，像在質問背叛者" },
+  { label: "溫柔", value: "溫柔深情，語調柔和" },
+  { label: "開心", value: "開心喜悅，語調高昂" },
+  { label: "平靜", value: "平靜安穩，語調沉穩" },
+  { label: "關心", value: "關心牽掛，語調真摯" },
+  { label: "緩慢", value: "緩慢柔和，拖長音" },
+  { label: "慈祥", value: "慈祥溫暖，長輩慈愛" },
+  { label: "思念", value: "思念哀傷，語調低沉" },
+  { label: "鼓勵", value: "鼓勵振奮，語調有力" },
+  { label: "激昂", value: "激昂熱血，語調高亢" },
+  { label: "生氣", value: "生氣憤怒，語調壓迫" },
 ] as const;
 
 export default function HomeScreen() {
@@ -432,10 +432,10 @@ export default function HomeScreen() {
                 onPress={pickAudio}
                 style={[
                   styles.changeButton,
-                  { borderColor: colors.border },
+                  { borderColor: colors.primary },
                 ]}
               >
-                <Text style={[styles.changeButtonText, { color: colors.muted }]}>
+                <Text style={[styles.changeButtonText, { color: colors.primary }]}>
                   更換音檔
                 </Text>
               </TouchableOpacity>
@@ -578,7 +578,7 @@ export default function HomeScreen() {
                       style={[
                         styles.emotionChip,
                         {
-                          backgroundColor: isSelected ? colors.primary : colors.background,
+                          backgroundColor: isSelected ? colors.primary : colors.surface,
                           borderColor: isSelected ? colors.primary : colors.border,
                         },
                       ]}
@@ -586,7 +586,7 @@ export default function HomeScreen() {
                       <Text
                         style={[
                           styles.emotionChipText,
-                          { color: isSelected ? "#FFFFFF" : colors.foreground },
+                          { color: isSelected ? colors.background : colors.foreground },
                         ]}
                       >
                         {emo.label}
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   previewPlayButton: {
     width: 36,
     height: 36,
-    borderRadius: 14,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -951,8 +951,8 @@ const styles = StyleSheet.create({
   changeButton: {
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     marginTop: 4,
   },
   changeButtonText: {

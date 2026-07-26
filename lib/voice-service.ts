@@ -485,17 +485,15 @@ export async function generateSpeech(
   // 台灣口吻優化：在 instruct 中加入台灣國語語助詞提示
   let finalInstruct = params.instruct || "";
   if (params.emotion) {
-    // 強化情緒表達：明確要求 AI 放大情緒波動
-    const emotionBoost = `【情緒要求】${params.emotion}。請務必嚴格遵守此情緒設定，讓語調起伏、語速變化、停頓和呼吸都充分展現此情緒，不要平淡唸讀，要像真人一樣帶有強烈的情感波動`;
+    // 簡潔情緒提示：直接用關鍵詞引導語調
     finalInstruct = finalInstruct
-      ? `${finalInstruct}。${emotionBoost}`
-      : emotionBoost;
+      ? `${finalInstruct}。語氣：${params.emotion}`
+      : `語氣：${params.emotion}`;
   }
-  // 加入台灣口吻提示，讓語助詞更自然
-  const taiwanHint = "使用台灣國語口吻，語助詞如喔、欸、耶、啦要自然貼近台灣人說話習慣";
+  // 簡潔台灣口吻提示
   finalInstruct = finalInstruct
-    ? `${finalInstruct}。${taiwanHint}`
-    : taiwanHint;
+    ? `${finalInstruct}。台灣國語口吻`
+    : "台灣國語口吻";
 
   // 自動加入中文發音提示：偵測文字中的中文字，為罕見字/人名加上拼音標注
   // 解決 G2P 模型將「蔡承諺」錯誤映射為「蔡懲罰」等發音問題

@@ -332,3 +332,13 @@
 - [x] 建立 tests/pinyin-helpers.test.ts 單元測試（14 tests passed）
 - [x] TypeScript 0 errors
 - [x] 重啟 dev server
+
+## UI/UX 修復（第三十一輪）
+
+- [x] 回憶庫提示詞過長：減少拼音標注數量
+- [x] 情緒提示詞無效：簡化情緒值和 emotionBoost
+- [x] 儲存音檔空白框/無效按鍵修復
+- [x] 添加更多標籤按鈕看不到字修復
+- [x] Voicebox AI 更名為迴響-AI語音克隆
+- [x] 播放鈕統一改圓形
+- [x] 深色模式可見性修復（小播放鈕、情緒按鈕、更換音檔等）

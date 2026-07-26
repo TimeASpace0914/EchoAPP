@@ -39,30 +39,16 @@ async function handleDownloadEntry(entry: HistoryEntry) {
         [
           { text: "取消", onPress: () => resolve(null) },
           { text: "儲存", onPress: (text?: string) => resolve(text || defaultName) },
-          { text: "儲存並分享", onPress: (text?: string) => resolve(`SHARE:${text || defaultName}`) },
         ],
         "plain-text",
         defaultName,
       );
     });
     if (!customName) return;
-    const isShare = customName.startsWith("SHARE:");
-    const fileName = `${isShare ? customName.slice(6) : customName}.wav`;
+    const fileName = `${customName}.wav`;
     const result = await saveAudioToDevice(entry.audioUri, fileName);
     if (result.success) {
-      if (isShare) {
-        if (Platform.OS === "web" && !(await Sharing.isAvailableAsync())) {
-          Alert.alert("下載完成", `音檔「${fileName}」已儲存，但此平台不支援分享功能`);
-          return;
-        }
-        await Sharing.shareAsync(entry.audioUri, {
-          dialogTitle: "分享親友的聲音",
-          mimeType: "audio/wav",
-          UTI: "com.microsoft.waveform",
-        });
-      } else {
-        Alert.alert("下載完成", `音檔「${fileName}」已儲存至手機媒體庫`);
-      }
+      Alert.alert("下載完成", `音檔「${fileName}」已儲存至手機媒體庫`);
     } else {
       Alert.alert("下載失敗", result.error || "無法下載此音檔");
     }
@@ -227,7 +213,7 @@ export default function HistoryScreen() {
       <Text
         style={[
           styles.filterChipText,
-          { color: activeFilter === item ? "#FFFFFF" : colors.primary },
+          { color: activeFilter === item ? colors.background : colors.primary },
         ]}
       >
         {item}
@@ -566,8 +552,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   entryEditButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -620,21 +607,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   entryPlayButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   entryActionButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   entryDeleteButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },

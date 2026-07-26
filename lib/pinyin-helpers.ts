@@ -64,13 +64,10 @@ export function getPinyinAnnotation(text: string): string | null {
  *
  * 策略：
  * 1. 提取文字中所有連續中文字片段（≥2字）
- * 2. 對每個片段產生拼音標注
- * 3. 組合成提示字串
+ * 2. 只標注較長的片段（≥3字），避免常見詞彙佔用提示空間
+ * 3. 組合成簡潔提示字串
  *
- * 例如輸入「我是蔡承諺，今天天氣很好」
- * 產生提示：「『蔡承諺』的拼音是『cài chéng yàn』，『今天』的拼音是『jīn tiān』，請按照標準普通話發音朗讀，遇到人名請特別注意正確發音」
- *
- * 為避免提示過長，最多只標注前 5 個片段
+ * 為避免提示過長，最多只標注前 2 個片段
  */
 export function generatePronunciationHint(text: string): string | null {
   if (!containsChinese(text)) {
@@ -82,15 +79,20 @@ export function generatePronunciationHint(text: string): string | null {
     return null;
   }
 
-  // 限制最多標注 5 個片段，避免 instruct 過長
-  const maxSegments = 5;
-  const segmentsToAnnotate = segments.slice(0, maxSegments);
+  // 只標注 ≥3 字的片段（通常是人名、專有名詞），避免常見短詞
+  const longSegments = segments.filter((s) => s.length >= 3);
+  // 最多 2 個片段，保持 instruct 簡潔
+  const segmentsToAnnotate = longSegments.slice(0, 2);
+
+  if (segmentsToAnnotate.length === 0) {
+    return null;
+  }
 
   const annotations: string[] = [];
   for (const segment of segmentsToAnnotate) {
     const pinyinStr = getPinyinAnnotation(segment);
     if (pinyinStr) {
-      annotations.push(`「${segment}」的拼音是「${pinyinStr}」`);
+      annotations.push(`${segment}=${pinyinStr}`);
     }
   }
 
@@ -98,8 +100,8 @@ export function generatePronunciationHint(text: string): string | null {
     return null;
   }
 
-  // 組合提示字串
-  const hint = `請按照標準普通話發音朗讀，${annotations.join("，")}，遇到人名請特別注意正確發音，不要猜測罕見字的讀音`;
+  // 簡潔提示：只標注拼音，不加多餘描述
+  const hint = `人名發音：${annotations.join("、")}`;
   return hint;
 }
 

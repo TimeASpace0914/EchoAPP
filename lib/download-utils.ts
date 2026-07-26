@@ -64,15 +64,38 @@ export async function saveAudioToDevice(
     }
 
     // 儲存到用戶手機媒體庫
-    // 使用 createAsset 而非 saveToLibraryAsync，因為 saveToLibraryAsync 在部分 Android 裝置上
-    // 對音檔的支援不一致。createAsset 會在媒體庫中建立新資產，更可靠。
+    // iOS: saveToLibraryAsync 更可靠（createAssetAsync 對 cache URL 常失敗）
+    // Android: createAssetAsync 更可靠（saveToLibraryAsync 對音檔支援不一致）
     try {
-      const asset = await MediaLibrary.createAssetAsync(localUri);
-      console.log('[download-utils] Asset created:', asset.uri);
-    } catch (createErr) {
-      // createAsset 失敗時退回 saveToLibraryAsync
-      console.warn('[download-utils] createAsset failed, trying saveToLibraryAsync:', createErr);
-      await MediaLibrary.saveToLibraryAsync(localUri);
+      if (Platform.OS === "ios") {
+        await MediaLibrary.saveToLibraryAsync(localUri);
+      } else {
+        const asset = await MediaLibrary.createAssetAsync(localUri);
+        console.log('[download-utils] Asset created:', asset.uri);
+      }
+    } catch (saveErr) {
+      // 主要方法失敗時嘗試另一種
+      console.warn('[download-utils] Primary save failed, trying fallback:', saveErr);
+      try {
+        if (Platform.OS === "ios") {
+          const asset = await MediaLibrary.createAssetAsync(localUri);
+          console.log('[download-utils] Asset created via fallback:', asset.uri);
+        } else {
+          await MediaLibrary.saveToLibraryAsync(localUri);
+        }
+      } catch (fallbackErr) {
+        // 兩種方法都失敗，退回 Sharing
+        console.warn('[download-utils] Both save methods failed:', fallbackErr);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(localUri, {
+            dialogTitle: "儲存音檔到...",
+            mimeType: "audio/wav",
+            UTI: "com.microsoft.waveform",
+          });
+          return { success: true };
+        }
+        return { success: false, error: "無法儲存音檔到媒體庫" };
+      }
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 

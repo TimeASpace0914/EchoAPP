@@ -59,20 +59,20 @@ describe("generatePronunciationHint", () => {
     expect(hint).toContain("cài");
     expect(hint).toContain("chéng");
     expect(hint).toContain("yàn");
-    expect(hint).toContain("標準普通話發音");
+    expect(hint).toContain("人名發音");
   });
 
   it("should return null for non-Chinese text", () => {
     expect(generatePronunciationHint("Hello World")).toBeNull();
   });
 
-  it("should limit to 5 segments max", () => {
+  it("should limit to 2 segments max", () => {
     const longText = "今天天氣很好明天也不錯後天可能下雨大後天會放晴最後一天放假";
     const hint = generatePronunciationHint(longText);
     expect(hint).not.toBeNull();
-    // Should not contain more than 5 annotations
-    const annotationCount = (hint?.match(/「/g) || []).length;
-    expect(annotationCount).toBeLessThanOrEqual(5);
+    // Should not contain more than 2 annotations
+    const annotationCount = (hint?.match(/=/g) || []).length;
+    expect(annotationCount).toBeLessThanOrEqual(2);
   });
 });
 
@@ -88,7 +88,8 @@ describe("appendPronunciationHint", () => {
     const result = appendPronunciationHint("", "我是蔡承諺");
     expect(result).toContain("蔡承諺");
     expect(result).toContain("cài");
-    expect(result).not.toContain("。");
+    // 簡化後的格式不包含多餘的句號分隔
+    expect(result).toContain("人名發音");
   });
 
   it("should return original instruct for non-Chinese text", () => {

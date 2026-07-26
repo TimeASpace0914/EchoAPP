@@ -330,7 +330,7 @@ export default function ResultScreen() {
             <View style={[styles.sourceBadge, { backgroundColor: isRealVoice ? `${colors.success}15` : `${colors.warning}15` }]}>
               <View style={[styles.sourceDot, { backgroundColor: isRealVoice ? colors.success : colors.warning }]} />
               <Text style={[styles.sourceText, { color: isRealVoice ? colors.success : colors.warning }]}>
-                {isRealVoice ? "Voicebox AI 語音克隆" : "模擬語音（Voicebox 未連線）"}
+                {isRealVoice ? "迴響-AI語音克隆" : "模擬語音（未連線）"}
               </Text>
             </View>
 
@@ -438,7 +438,7 @@ export default function ResultScreen() {
                   size={24}
                   color={isDownloading ? colors.muted : colors.foreground}
                 />
-                <Text style={[styles.actionLabel, { color: colors.muted }]}>
+                <Text style={[styles.actionLabel, { color: colors.foreground }]}>
                   {isDownloading ? "下載中" : "下載"}
                 </Text>
               </TouchableOpacity>
@@ -454,7 +454,7 @@ export default function ResultScreen() {
                   size={24}
                   color={isSharing ? colors.muted : colors.foreground}
                 />
-                <Text style={[styles.actionLabel, { color: colors.muted }]}>
+                <Text style={[styles.actionLabel, { color: colors.foreground }]}>
                   {isSharing ? "分享中" : "分享"}
                 </Text>
               </TouchableOpacity>
@@ -465,7 +465,7 @@ export default function ResultScreen() {
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
                 <IconSymbol name="arrow.clockwise" size={24} color={colors.foreground} />
-                <Text style={[styles.actionLabel, { color: colors.muted }]}>重新生成</Text>
+                <Text style={[styles.actionLabel, { color: colors.foreground }]}>重新生成</Text>
               </TouchableOpacity>
             </View>
 
@@ -514,10 +514,10 @@ export default function ResultScreen() {
                 <TouchableOpacity
                   onPress={() => setShowTagInput(true)}
                   activeOpacity={0.7}
-                  style={[styles.addTagButton, { borderColor: colors.border }]}
+                  style={[styles.addTagButton, { borderColor: colors.primary }]}
                 >
-                  <IconSymbol name="chevron.left.forwardslash.chevron.right" size={14} color={colors.muted} />
-                  <Text style={[styles.addTagText, { color: colors.muted }]}>
+                  <IconSymbol name="chevron.left.forwardslash.chevron.right" size={14} color={colors.primary} />
+                  <Text style={[styles.addTagText, { color: colors.primary }]}>
                     {tags.length > 0 ? "添加更多標籤" : "添加標籤方便日後尋找"}
                   </Text>
                 </TouchableOpacity>
@@ -577,7 +577,7 @@ export default function ResultScreen() {
                 <TouchableOpacity
                   onPress={() => setShowDownloadModal(false)}
                   activeOpacity={0.7}
-                  style={[styles.modalButton, { borderColor: colors.border, flex: 1 }]}
+                  style={[styles.modalButton, { borderColor: colors.border, backgroundColor: colors.background, flex: 1 }]}
                 >
                   <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
                 </TouchableOpacity>
@@ -596,7 +596,7 @@ export default function ResultScreen() {
                 onPress={handleDownloadAndShare}
                 disabled={isDownloading}
                 activeOpacity={0.7}
-                style={[styles.modalButton, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1.5, opacity: isDownloading ? 0.6 : 1 }]}
+                style={[styles.modalButton, { backgroundColor: colors.background, borderColor: colors.primary, borderWidth: 1.5, opacity: isDownloading ? 0.6 : 1 }]}
               >
                 <Text style={[styles.modalButtonText, { color: colors.primary, fontWeight: "600" }]}>
                   {isDownloading ? "處理中..." : "儲存並分享到社群"}
@@ -803,13 +803,14 @@ const styles = StyleSheet.create({
   skipButton: {
     width: 48,
     height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   playButton: {
     width: 64,
     height: 64,
-    borderRadius: 20,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
     shadowOffset: { width: 0, height: 2 },
@@ -824,7 +825,7 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 76,
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 24,
     alignItems: "center",
     gap: 8,
     shadowOffset: { width: 0, height: 1 },
@@ -908,8 +909,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderStyle: "dashed",
   },
   addTagText: {
