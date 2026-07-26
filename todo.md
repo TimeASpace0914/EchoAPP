@@ -316,3 +316,9 @@
 - [x] Waveform 組件預設顏色從暖橘改為純黑
 - [x] result.tsx 所有圓角同步縮小
 - [x] TypeScript 0 errors
+
+## 第三十五輪需求（圓角調整 + 開頭動畫重寫）
+
+- [x] 圓角從 8px 調大到 12-14px（卡片 14、按鈕 12、輸入框/chip 10）
+- [x] 開頭動畫從直線進度條改為波浪圓形動畫（同心圓波紋擴散 + 底部波浪 bar 跳動）
+- [x] TypeScript 0 errors
