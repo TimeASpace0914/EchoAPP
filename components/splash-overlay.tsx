@@ -40,13 +40,13 @@ export function SplashOverlay({
   const overlayOpacity = useSharedValue(1);
   const [isDone, setIsDone] = useState(false);
 
-  // 三圈波紋
-  const ring1Scale = useSharedValue(0.3);
-  const ring1Opacity = useSharedValue(0.5);
-  const ring2Scale = useSharedValue(0.3);
-  const ring2Opacity = useSharedValue(0.35);
-  const ring3Scale = useSharedValue(0.3);
-  const ring3Opacity = useSharedValue(0.2);
+  // 三圈波紋 — 初始 scale 極小、opacity 為 0（完全不可見）
+  const ring1Scale = useSharedValue(0.12);
+  const ring1Opacity = useSharedValue(0);
+  const ring2Scale = useSharedValue(0.12);
+  const ring2Opacity = useSharedValue(0);
+  const ring3Scale = useSharedValue(0.12);
+  const ring3Opacity = useSharedValue(0);
 
   const accentColor = isDark ? "#FFFFFF" : "#000000";
   const bgColor = isDark ? "#0A0A0A" : "#F2F2F5";
@@ -87,30 +87,35 @@ export function SplashOverlay({
       easing: SOFT_OUT,
     });
 
-    // 2. 三圈波紋緩慢循環擴散
-    const ringAnim = (scale: any, opacity: any, delay: number, startOpacity: number) => {
-      scale.value = withDelay(
-        delay,
-        withRepeat(
-          withSequence(
-            withTiming(2.0, { duration: 2200, easing: SOFT_EASE }),
-            withTiming(2.0, { duration: 0 })
-          ),
-          -1,
-          false
-        )
+    // 2. 三圈波紋 — 淡入 → 擴散 → 淡出，循環
+    // 修正「突然出現」問題：每個循環從 opacity 0 開始柔和淡入，不再用 duration:0 瞬間跳回
+    const ringAnim = (
+      scale: any,
+      opacity: any,
+      delay: number,
+      peakOpacity: number
+    ) => {
+      // 一個完整循環：淡入(400ms) → 擴散淡出(2000ms) → 停留不可見(200ms)
+      const cycleScale = withSequence(
+        // 淡入階段：scale 從 0.12 緩慢增到 0.25
+        withTiming(0.25, { duration: 400, easing: SOFT_EASE }),
+        // 擴散階段：scale 從 0.25 擴散到 1.4
+        withTiming(1.4, { duration: 2000, easing: SOFT_EASE }),
+        // 停留不可見
+        withTiming(0.12, { duration: 200 })
       );
-      opacity.value = withDelay(
-        delay,
-        withRepeat(
-          withSequence(
-            withTiming(0, { duration: 2200, easing: SOFT_EASE }),
-            withTiming(startOpacity, { duration: 0 })
-          ),
-          -1,
-          false
-        )
+
+      const cycleOpacity = withSequence(
+        // 淡入：opacity 從 0 升到 peakOpacity
+        withTiming(peakOpacity, { duration: 400, easing: SOFT_EASE }),
+        // 淡出：opacity 從 peakOpacity 降到 0
+        withTiming(0, { duration: 2000, easing: SOFT_EASE }),
+        // 保持不可見
+        withTiming(0, { duration: 200 })
       );
+
+      scale.value = withDelay(delay, withRepeat(cycleScale, -1, false));
+      opacity.value = withDelay(delay, withRepeat(cycleOpacity, -1, false));
     };
 
     ringAnim(ring1Scale, ring1Opacity, 0, 0.5);
@@ -145,7 +150,8 @@ export function SplashOverlay({
 
   if (isDone) return null;
 
-  const RING_SIZE = 220;
+  // 縮小波紋尺寸：220 → 160
+  const RING_SIZE = 160;
 
   return (
     <Animated.View style={[styles.overlay, { backgroundColor: bgColor }, overlayAnimatedStyle]}>
@@ -194,7 +200,7 @@ export function SplashOverlay({
 
           {/* LOGO 疊在波紋正中央 */}
           <Animated.View style={[styles.logoWrap, logoAnimatedStyle]}>
-            <Logo height={140} variant={isDark ? "white" : "black"} />
+            <Logo height={130} variant={isDark ? "white" : "black"} />
           </Animated.View>
         </View>
 
@@ -269,15 +275,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 48,
   },
+  // 縮小容器：220 → 160
   centerStage: {
-    width: 220,
-    height: 220,
+    width: 160,
+    height: 160,
     alignItems: "center",
     justifyContent: "center",
   },
   ringContainer: {
-    width: 220,
-    height: 220,
+    width: 160,
+    height: 160,
     alignItems: "center",
     justifyContent: "center",
   },
