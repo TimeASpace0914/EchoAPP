@@ -51,8 +51,33 @@ export function SplashOverlay({
   const accentColor = isDark ? "#FFFFFF" : "#000000";
   const bgColor = isDark ? "#0A0A0A" : "#F2F2F5";
 
+  // ★ 所有 useAnimatedStyle 必須在條件 return 之前呼叫（Rules of Hooks）
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+    transform: [{ scale: logoScale.value }],
+  }));
+
+  const ring1Style = useAnimatedStyle(() => ({
+    transform: [{ scale: ring1Scale.value }],
+    opacity: ring1Opacity.value,
+  }));
+
+  const ring2Style = useAnimatedStyle(() => ({
+    transform: [{ scale: ring2Scale.value }],
+    opacity: ring2Opacity.value,
+  }));
+
+  const ring3Style = useAnimatedStyle(() => ({
+    transform: [{ scale: ring3Scale.value }],
+    opacity: ring3Opacity.value,
+  }));
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
   useEffect(() => {
-    // 1. LOGO 柔和淡入 + 微放大（更慢更柔和）
+    // 1. LOGO 柔和淡入 + 微放大
     logoOpacity.value = withTiming(1, {
       duration: 1000,
       easing: SOFT_OUT,
@@ -120,31 +145,7 @@ export function SplashOverlay({
 
   if (isDone) return null;
 
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
-  }));
-
-  const ring1Style = useAnimatedStyle(() => ({
-    transform: [{ scale: ring1Scale.value }],
-    opacity: ring1Opacity.value,
-  }));
-
-  const ring2Style = useAnimatedStyle(() => ({
-    transform: [{ scale: ring2Scale.value }],
-    opacity: ring2Opacity.value,
-  }));
-
-  const ring3Style = useAnimatedStyle(() => ({
-    transform: [{ scale: ring3Scale.value }],
-    opacity: ring3Opacity.value,
-  }));
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const RING_SIZE = 180;
+  const RING_SIZE = 220;
 
   return (
     <Animated.View style={[styles.overlay, { backgroundColor: bgColor }, overlayAnimatedStyle]}>
@@ -193,7 +194,7 @@ export function SplashOverlay({
 
           {/* LOGO 疊在波紋正中央 */}
           <Animated.View style={[styles.logoWrap, logoAnimatedStyle]}>
-            <Logo height={110} variant={isDark ? "white" : "black"} />
+            <Logo height={140} variant={isDark ? "white" : "black"} />
           </Animated.View>
         </View>
 
@@ -269,14 +270,14 @@ const styles = StyleSheet.create({
     gap: 48,
   },
   centerStage: {
-    width: 180,
-    height: 180,
+    width: 220,
+    height: 220,
     alignItems: "center",
     justifyContent: "center",
   },
   ringContainer: {
-    width: 180,
-    height: 180,
+    width: 220,
+    height: 220,
     alignItems: "center",
     justifyContent: "center",
   },

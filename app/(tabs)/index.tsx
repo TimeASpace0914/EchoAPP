@@ -12,6 +12,12 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -72,6 +78,20 @@ export default function HomeScreen() {
   const [speed, setSpeed] = useState(1.0);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
+
+  // 首頁淡入過場動畫
+  const contentOpacity = useSharedValue(0);
+  const contentTranslateY = useSharedValue(12);
+
+  useEffect(() => {
+    contentOpacity.value = withTiming(1, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) });
+    contentTranslateY.value = withTiming(0, { duration: 600, easing: Easing.bezier(0.25, 0.1, 0.25, 1) });
+  }, []);
+
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [{ translateY: contentTranslateY.value }],
+  }));
 
   // 訂閱 generationStore 狀態變化
   useEffect(() => {
@@ -310,6 +330,7 @@ export default function HomeScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
+      <Animated.View style={[{ flex: 1 }, contentAnimatedStyle]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -655,6 +676,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 if (genStoreState.resultUri && genStoreState.resultCreatedAt) {
                   router.push({
                     pathname: "/result" as any,
@@ -688,6 +710,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => generationStore.reset()}
+              activeOpacity={0.7}
               style={[styles.dismissButton, { borderColor: colors.border }]}
             >
               <Text style={[styles.dismissButtonText, { color: colors.muted }]}>關閉</Text>
@@ -709,8 +732,10 @@ export default function HomeScreen() {
                 setGenError(null);
                 setGenProgress(0);
                 setGenStage("");
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 handleGenerate();
               }}
+              activeOpacity={0.7}
               style={[styles.retryButton, { backgroundColor: colors.primary }]}
             >
               <Text style={styles.retryButtonText}>重試</Text>
@@ -721,6 +746,7 @@ export default function HomeScreen() {
                 setGenProgress(0);
                 setGenStage("");
               }}
+              activeOpacity={0.7}
               style={[styles.dismissButton, { borderColor: colors.border }]}
             >
               <Text style={[styles.dismissButtonText, { color: colors.muted }]}>關閉</Text>
@@ -741,6 +767,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      </Animated.View>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );

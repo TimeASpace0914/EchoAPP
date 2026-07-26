@@ -306,6 +306,7 @@ export default function ResultScreen() {
       <View style={[styles.navBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => router.back()}
+          activeOpacity={0.6}
           style={styles.navButton}
         >
           <IconSymbol name="chevron.left" size={24} color={colors.foreground} />
@@ -313,6 +314,7 @@ export default function ResultScreen() {
         <Text style={[styles.navTitle, { color: colors.foreground }]}>生成完成</Text>
         <TouchableOpacity
           onPress={() => router.back()}
+          activeOpacity={0.6}
           style={styles.navButton}
         >
           <IconSymbol name="xmark" size={24} color={colors.muted} />
@@ -381,6 +383,7 @@ export default function ResultScreen() {
             <View style={styles.playControlRow}>
               {/* 後退 10 秒 */}
               <TouchableOpacity
+                activeOpacity={0.6}
                 onPress={() => {
                   const newTime = Math.max(0, currentTime - 10);
                   player.seekTo(newTime);
@@ -396,6 +399,7 @@ export default function ResultScreen() {
               {/* 主播放/暫停按鈕 */}
               <TouchableOpacity
                 onPress={togglePlay}
+                activeOpacity={0.7}
                 style={[styles.playButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
               >
                 <IconSymbol
@@ -407,6 +411,7 @@ export default function ResultScreen() {
 
               {/* 前進 10 秒 */}
               <TouchableOpacity
+                activeOpacity={0.6}
                 onPress={() => {
                   const newTime = Math.min(duration, currentTime + 10);
                   player.seekTo(newTime);
@@ -425,6 +430,7 @@ export default function ResultScreen() {
               <TouchableOpacity
                 onPress={handleDownload}
                 disabled={isDownloading}
+                activeOpacity={0.7}
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
                 <IconSymbol
@@ -440,6 +446,7 @@ export default function ResultScreen() {
               <TouchableOpacity
                 onPress={handleShare}
                 disabled={isSharing}
+                activeOpacity={0.7}
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
                 <IconSymbol
@@ -454,6 +461,7 @@ export default function ResultScreen() {
 
               <TouchableOpacity
                 onPress={handleRegenerate}
+                activeOpacity={0.7}
                 style={[styles.actionButton, { backgroundColor: colors.surface, shadowColor: "#000" }]}
               >
                 <IconSymbol name="arrow.clockwise" size={24} color={colors.foreground} />
@@ -469,6 +477,7 @@ export default function ResultScreen() {
                   setTitleInput(title);
                   setShowTitleEdit(true);
                 }}
+                activeOpacity={0.7}
                 style={styles.nameRow}
               >
                 <View style={styles.nameLeft}>
@@ -504,6 +513,7 @@ export default function ResultScreen() {
                 )}
                 <TouchableOpacity
                   onPress={() => setShowTagInput(true)}
+                  activeOpacity={0.7}
                   style={[styles.addTagButton, { borderColor: colors.border }]}
                 >
                   <IconSymbol name="chevron.left.forwardslash.chevron.right" size={14} color={colors.muted} />
@@ -566,6 +576,7 @@ export default function ResultScreen() {
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
                   onPress={() => setShowDownloadModal(false)}
+                  activeOpacity={0.7}
                   style={[styles.modalButton, { borderColor: colors.border, flex: 1 }]}
                 >
                   <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
@@ -573,6 +584,7 @@ export default function ResultScreen() {
                 <TouchableOpacity
                   onPress={handleDownloadConfirm}
                   disabled={isDownloading}
+                  activeOpacity={0.7}
                   style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1, opacity: isDownloading ? 0.6 : 1 }]}
                 >
                   <Text style={styles.modalButtonTextActive}>
@@ -583,6 +595,7 @@ export default function ResultScreen() {
               <TouchableOpacity
                 onPress={handleDownloadAndShare}
                 disabled={isDownloading}
+                activeOpacity={0.7}
                 style={[styles.modalButton, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1.5, opacity: isDownloading ? 0.6 : 1 }]}
               >
                 <Text style={[styles.modalButtonText, { color: colors.primary, fontWeight: "600" }]}>
@@ -621,12 +634,14 @@ export default function ResultScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 onPress={() => setShowTitleEdit(false)}
+                activeOpacity={0.7}
                 style={[styles.modalButton, { borderColor: colors.border }]}
               >
                 <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveTitle}
+                activeOpacity={0.7}
                 style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
                 <Text style={styles.modalButtonTextActive}>儲存</Text>
@@ -663,12 +678,14 @@ export default function ResultScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 onPress={() => setShowTagInput(false)}
+                activeOpacity={0.7}
                 style={[styles.modalButton, { borderColor: colors.border }]}
               >
                 <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleAddTag}
+                activeOpacity={0.7}
                 style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
                 <Text style={styles.modalButtonTextActive}>添加</Text>
