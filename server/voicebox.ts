@@ -16,6 +16,10 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import {
+  normalizeReferenceText,
+  validateChineseReferenceTranscript,
+} from "./transcription-quality";
+import {
   resolveTranscriptionLanguage,
   resolveWhisperModelSize,
 } from "./voicebox-config";
@@ -79,7 +83,7 @@ const NGROK_HEADERS = { "ngrok-skip-browser-warning": "true" };
  * 使用 Voicebox 的 /transcribe 端點自動轉錄音檔，取得真實 reference_text
  * 這是解決「胡言亂語」問題的關鍵：假的 reference_text 會被 AI 當成要說的內容
  */
-async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt?: string): Promise<string | null> {
+async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string | null> {
   const baseUrl = getVoiceboxUrl();
   const boundary = `----TranscribeBoundary${Date.now()}`;
   const ext = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : "m4a";
@@ -109,16 +113,6 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt
     `${whisperModel}\r\n`
   ));
 
-  // prompt part — 提供上下文給 Whisper 幫助識別中文人名和專有名詞
-  if (hintPrompt && hintPrompt.trim().length > 0) {
-    parts.push(Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="prompt"\r\n\r\n` +
-      `${hintPrompt.trim()}\r\n`
-    ));
-    console.log(`[Voicebox] Transcribe with hint prompt: "${hintPrompt.substring(0, 60)}"`);
-  }
-
   const endBoundary = Buffer.from(`--${boundary}--\r\n`);
   parts.push(endBoundary);
   const multipartBody = Buffer.concat(parts);
@@ -143,9 +137,18 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt
     }
 
     const result = await res.json() as { text: string; duration: number };
-    const transcribedText = result.text?.trim() || null;
-    console.log(`[Voicebox] Transcribed: "${transcribedText?.substring(0, 100)}" (duration: ${result.duration}s)`);
-    return transcribedText;
+    const rawText = result.text || "";
+    const validation = validateChineseReferenceTranscript(rawText);
+
+    if (!validation.valid || !validation.text) {
+      console.warn(
+        `[Voicebox] Ignoring unreliable automatic transcript: ${validation.reason || "unknown validation error"}`,
+      );
+      return null;
+    }
+
+    console.log(`[Voicebox] Transcribed: "${validation.text.substring(0, 100)}" (duration: ${result.duration}s)`);
+    return validation.text;
   } catch (error) {
     console.warn(`[Voicebox] Transcribe error:`, error instanceof Error ? error.message : error);
     return null;
@@ -329,26 +332,37 @@ export async function uploadVoiceProfile(
     );
     const fileFooter = Buffer.from("\r\n");
     
-    // reference_text 是 Voicebox 必填欄位
-    // 關鍵修復：使用 Voicebox /transcribe 端點自動轉錄音檔，取得真實的 reference_text
-    // 之前送假的 reference_text（「這是一段語音錄音」）導致 AI 把這段假文字也唸出來（胡言亂語）
-    let actualReferenceText = (referenceText && referenceText.trim().length > 0)
-      ? referenceText
-      : null;
+    // reference_text 是 Voicebox 必填欄位。音檔與文字必須相符；將錯誤逐字稿
+    // 送進模型，比停止流程更容易造成後續生成「胡言亂語」或錯讀。
+    let actualReferenceText: string | null = null;
 
-    // 若沒有提供真實的 reference_text，用 Voicebox 自動轉錄
-    if (!actualReferenceText) {
-      console.log(`[Voicebox] No reference_text provided, auto-transcribing audio...`);
-      // 用 profile 名稱和描述作為 Whisper 的 prompt 提示，幫助識別人名和專有名詞
-      const hintParts = [name, description].filter((s) => s && s.trim().length > 0);
-      const hintPrompt = hintParts.length > 0 ? hintParts.join("，") : undefined;
-      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType, hintPrompt);
-      // 若轉錄也失敗，用最小化的通用文字（不會被 AI 當成要說的內容）
+    if (referenceText && referenceText.trim().length > 0) {
+      const validation = validateChineseReferenceTranscript(referenceText);
+      if (!validation.valid || !validation.text) {
+        return {
+          error: "音檔內容文字無法使用",
+          code: "UPLOAD_FAILED",
+          details: validation.reason || "請輸入音檔中實際說出的完整中文內容。",
+        };
+      }
+      actualReferenceText = validation.text;
+      console.log("[Voicebox] Using user-provided reference_text.");
+    } else {
+      console.log("[Voicebox] No reference_text provided, auto-transcribing Chinese audio...");
+      // Whisper prompt 應是接近音檔內容的文字，而非聲音描述或操作指令。
+      // 不以 profile 名稱（如 echo_時間戳）當 prompt，避免將無關字串帶進轉錄結果。
+      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType);
+
       if (!actualReferenceText) {
-        actualReferenceText = '嗯';
-        console.warn(`[Voicebox] Transcribe failed, using minimal fallback: "${actualReferenceText}"`);
+        return {
+          error: "無法可靠辨識音檔內容",
+          code: "UPLOAD_FAILED",
+          details: "為避免錯誤文字造成聲音錯讀，請在「音檔內容文字」欄位貼上音檔實際說的完整內容後再試。",
+        };
       }
     }
+
+    actualReferenceText = normalizeReferenceText(actualReferenceText);
     
     const endBoundary = Buffer.from(`--${boundary}--\r\n`);
     const textPart = Buffer.from(
