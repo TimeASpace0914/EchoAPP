@@ -113,6 +113,10 @@ pnpm dev
 
 啟動後，Metro Bundler 運行於 `http://localhost:8081`，後端 API 伺服器運行於 `http://localhost:3000`。
 
+### 新電腦快速重建
+
+若要在新電腦完整還原開發與 Voicebox 測試環境，請閱讀 [`bootstrap/README.md`](./bootstrap/README.md)。其中提供必要工具安裝、Voicebox 模型預下載、`.env` 範例、中文 Whisper 參數，以及手機測試步驟。這些資產都已隨儲存庫版控；二進位程式與模型權重則透過官方來源與腳本下載，不會被提交到 GitHub。
+
 ---
 
 ## 環境變數設定
@@ -124,10 +128,13 @@ pnpm dev
 # 必要變數（語音克隆核心功能）
 # ============================================
 
-# Voicebox TTS 服務網址
-# 本地部署：http://localhost:17493
-# Cloudflare Tunnel：https://voicebox.echo-voice.cc
-VOICEBOX_URL=https://voicebox.echo-voice.cc
+# Voicebox TTS 服務網址（新電腦本機測試建議使用 localhost）
+VOICEBOX_URL=http://127.0.0.1:17493
+
+# 參考音檔轉錄設定：中文建議固定 zh，模型預設 turbo
+# 支援模型：base / small / medium / large / turbo
+VOICEBOX_WHISPER_MODEL=turbo
+VOICEBOX_TRANSCRIPTION_LANGUAGE=zh
 
 # ============================================
 # 後端伺服器變數（認證與資料庫）
@@ -181,7 +188,9 @@ PORT=3000
 
 | 變數 | 必要性 | 影響功能 |
 |------|--------|----------|
-| `VOICEBOX_URL` | **必要** | 語音克隆生成、聲音上傳、健康檢查 |
+| `VOICEBOX_URL` | **必要** | 語音克隆生成、聲音上傳、健康檢查；新電腦預設 `http://127.0.0.1:17493` |
+| `VOICEBOX_WHISPER_MODEL` | 建議 | 參考音檔轉錄模型；中文預設 `turbo`，高難度音檔可改 `large` |
+| `VOICEBOX_TRANSCRIPTION_LANGUAGE` | 建議 | 參考音檔的明確語言提示；中文 profile 使用 `zh` |
 | `DATABASE_URL` | 可選 | 使用者認證、歷史紀錄跨裝置同步（不設定則使用本地 AsyncStorage） |
 | `JWT_SECRET` | 可選 | Session Cookie 簽章（不設定則認證功能無效） |
 | `OAUTH_SERVER_URL` | 可選 | Manus 平台 OAuth 登入 |

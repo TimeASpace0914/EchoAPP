@@ -105,9 +105,16 @@ create_env_file() {
 # --------------------------------------------
 # 必要：Voicebox TTS 服務網址
 # --------------------------------------------
-# 本地部署：http://localhost:17493
-# Cloudflare Tunnel：https://voicebox.echo-voice.cc
-VOICEBOX_URL=https://voicebox.echo-voice.cc
+# 本地部署：http://127.0.0.1:17493
+# Cloudflare Tunnel：https://voicebox.echo-voice.cc（僅在完成本機測試後使用）
+VOICEBOX_URL=http://127.0.0.1:17493
+
+# Whisper 轉錄模型：base / small / medium / large / turbo
+# 中文參考音檔建議使用 turbo；若音檔雜訊嚴重且硬體足夠，可改為 large。
+VOICEBOX_WHISPER_MODEL=turbo
+
+# 對短中文參考音檔提供明確語言提示，避免錯判為英文。
+VOICEBOX_TRANSCRIPTION_LANGUAGE=zh
 
 # --------------------------------------------
 # 可選：PostgreSQL 資料庫（跨裝置同步用）
@@ -138,7 +145,7 @@ VOICEBOX_URL=https://voicebox.echo-voice.cc
 PORT=3000
 ENVEOF
 
-  ok ".env 已建立（預設 VOICEBOX_URL=https://voicebox.echo-voice.cc）"
+  ok ".env 已建立（預設使用本機 Voicebox：http://127.0.0.1:17493）"
   warn "請檢查 .env 內容，確認 Voicebox 服務網址正確"
 }
 
