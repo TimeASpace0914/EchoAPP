@@ -15,6 +15,10 @@ import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import {
+  resolveTranscriptionLanguage,
+  resolveWhisperModelSize,
+} from "./voicebox-config";
 
 const execFileAsync = promisify(execFile);
 
@@ -89,11 +93,20 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt
   const fileFooter = Buffer.from("\r\n");
   const parts: Buffer[] = [fileHeader, audioBuffer, fileFooter];
 
-  // language part
+  // Short reference clips are vulnerable to language mis-detection. EchoAPP's
+  // Chinese profile flow therefore sends an explicit hint; it can be overridden
+  // in .env when multilingual support is intentionally enabled.
+  const transcriptionLanguage = resolveTranscriptionLanguage();
+  const whisperModel = resolveWhisperModelSize();
   parts.push(Buffer.from(
     `--${boundary}\r\n` +
     `Content-Disposition: form-data; name="language"\r\n\r\n` +
-    `zh\r\n`
+    `${transcriptionLanguage}\r\n`
+  ));
+  parts.push(Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="model_size"\r\n\r\n` +
+    `${whisperModel}\r\n`
   ));
 
   // prompt part — 提供上下文給 Whisper 幫助識別中文人名和專有名詞
@@ -111,7 +124,9 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt
   const multipartBody = Buffer.concat(parts);
 
   try {
-    console.log(`[Voicebox] Transcribing audio for real reference_text (${audioBuffer.length} bytes)...`);
+    console.log(
+      `[Voicebox] Transcribing reference audio (${audioBuffer.length} bytes, language=${transcriptionLanguage}, model=${whisperModel})...`,
+    );
     const res = await fetchWithRetry(`${baseUrl}/transcribe`, {
       method: "POST",
       headers: {
