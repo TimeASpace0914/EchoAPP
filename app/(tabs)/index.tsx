@@ -410,16 +410,16 @@ export default function HomeScreen() {
               {/* 參考文字（重要！） */}
               <View style={[styles.descriptionBox, { backgroundColor: colors.background, borderColor: colors.border, marginTop: 10 }]}>
                 <Text style={[styles.descriptionLabel, { color: colors.foreground }]}>
-                  音檔內容文字（重要）
+                  音檔內容文字（建議填寫）
                 </Text>
                 <Text style={[styles.descriptionHint, { color: colors.muted }]}>
-                  輸入音檔中實際說的文字，可大幅提升語音克隆精準度，避免人名識別錯誤
+                  有逐字稿時請直接貼上；沒有也可留白讓系統辨識。若辨識錯字，請改填實際內容再生成。
                 </Text>
                 <TextInput
                   style={[styles.descriptionInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.foreground, minHeight: 60 }]}
                   value={referenceText}
                   onChangeText={(val) => setReferenceText(val.slice(0, 200))}
-                  placeholder="例如：大家好，我是蔡承諺，今天很高興..."
+                  placeholder="例如：大家好，我是蔡承諺，今天很高興見到大家。"
                   placeholderTextColor={colors.muted}
                   maxLength={200}
                   returnKeyType="done"
