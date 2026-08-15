@@ -382,5 +382,7 @@
 - [x] 比對歷史成功生成的情緒、Profile 個性、語速及 instruct 拼接邏輯
 - [x] 統合 Profile 個性與生成指令、限制主情緒，避免互斥情緒混入
 - [x] 限制自動拼音提示為疑似姓名，避免一般片語干擾台灣口吻
+- [x] 建立內建讀音詞庫，強制修正誦、禱、蔡承諺等已知錯讀
+- [x] 支援 `字(注音)` 格式的手動讀音覆寫，並在朗讀文字中移除標記
 - [ ] 在本機 Windows Voicebox 執行 DEBUG 重現並取得完整堆疊
 - [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構

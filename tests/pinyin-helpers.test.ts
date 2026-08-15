@@ -5,6 +5,7 @@ import {
   getPinyinAnnotation,
   generatePronunciationHint,
   appendPronunciationHint,
+  stripPronunciationMarkers,
 } from "../lib/pinyin-helpers";
 
 describe("containsChinese", () => {
@@ -59,7 +60,7 @@ describe("generatePronunciationHint", () => {
     expect(hint).toContain("cài");
     expect(hint).toContain("chéng");
     expect(hint).toContain("yàn");
-    expect(hint).toContain("人名發音");
+    expect(hint).toContain("強制讀音規則");
   });
 
   it("should not annotate ordinary Chinese phrases as names", () => {
@@ -75,8 +76,8 @@ describe("generatePronunciationHint", () => {
     const longText = "蔡承諺與陳小明、林大華一起參加活動";
     const hint = generatePronunciationHint(longText);
     expect(hint).not.toBeNull();
-    // Should not contain more than 2 annotations
-    const annotationCount = (hint?.match(/=/g) || []).length;
+    // Should not contain more than 2 automatically guessed names
+    const annotationCount = (hint?.match(/讀作/g) || []).length;
     expect(annotationCount).toBeLessThanOrEqual(2);
   });
 });
@@ -93,8 +94,7 @@ describe("appendPronunciationHint", () => {
     const result = appendPronunciationHint("", "我是蔡承諺");
     expect(result).toContain("蔡承諺");
     expect(result).toContain("cài");
-    // 簡化後的格式不包含多餘的句號分隔
-    expect(result).toContain("人名發音");
+    expect(result).toContain("強制讀音規則");
   });
 
   it("should return original instruct for non-Chinese text", () => {
@@ -105,5 +105,29 @@ describe("appendPronunciationHint", () => {
   it("should return empty string for empty instruct and non-Chinese text", () => {
     const result = appendPronunciationHint("", "Hello World");
     expect(result).toBe("");
+  });
+});
+
+describe("強制讀音詞庫與手動注音覆寫", () => {
+  it("should force known rare words and the known name", () => {
+    const hint = generatePronunciationHint("日日誦經，祝禱加持，蔡承諺為大家祝福");
+    expect(hint).toContain("rì rì sòng jīng");
+    expect(hint).toContain("zhù dǎo jiā chí");
+    expect(hint).toContain("cài chéng yàn");
+  });
+
+  it("should honor manual zhuyin overrides", () => {
+    const hint = generatePronunciationHint("日日誦(ㄙㄨㄥˋ)經，祝禱(ㄉㄠˇ)加持");
+    expect(hint).toContain("「誦」固定讀作「ㄙㄨㄥˋ」");
+    expect(hint).toContain("「禱」固定讀作「ㄉㄠˇ」");
+  });
+
+  it("should treat a single zhuyin annotation as the immediately preceding character", () => {
+    const hint = generatePronunciationHint("蔡承諺(ㄧㄢˋ)歡迎您");
+    expect(hint).toContain("「諺」固定讀作「ㄧㄢˋ」");
+  });
+
+  it("should remove markers from the customer-visible spoken text", () => {
+    expect(stripPronunciationMarkers("日日誦(ㄙㄨㄥˋ)經，蔡承諺(ㄧㄢˋ)")).toBe("日日誦經，蔡承諺");
   });
 });

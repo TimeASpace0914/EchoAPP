@@ -39,6 +39,7 @@ import {
   type HistoryEntry,
 } from "@/lib/voice-service";
 import { generationStore, type GenerationState } from "@/lib/generation-store";
+import { stripPronunciationMarkers } from "@/lib/pinyin-helpers";
 import Slider from "@react-native-community/slider";
 
 const MAX_TEXT_LENGTH = 500;
@@ -219,6 +220,9 @@ export default function HomeScreen() {
     setGenElapsed(0);
     generationStore.startGeneration();
 
+    // 注音標記只用來約束模型發音；歷史、結果頁與客戶可見文字皆使用乾淨原文。
+    const spokenText = stripPronunciationMarkers(text.trim());
+
     try {
       // UI 保留多選亮起供使用者比較，但語音模型只接受最後選擇的一個「主情緒」，
       // 避免同時傳入溫柔、激昂、悲傷等互斥描述造成聲音與口音不穩定。
@@ -243,7 +247,7 @@ export default function HomeScreen() {
 
       const entry: HistoryEntry = {
         id: `echo_${result.createdAt}`,
-        text: text.trim(),
+        text: spokenText,
         audioUri: result.audioUri,
         referenceAudioName: audioName,
         duration: result.duration,
@@ -256,7 +260,7 @@ export default function HomeScreen() {
 
       generationStore.completeGeneration({
         audioUri: result.audioUri,
-        text: text.trim(),
+        text: spokenText,
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
@@ -272,7 +276,7 @@ export default function HomeScreen() {
         pathname: "/result" as any,
         params: {
           audioUri: result.audioUri,
-          text: text.trim(),
+          text: spokenText,
           duration: result.duration.toString(),
           createdAt: result.createdAt.toString(),
           entryId: entry.id,
@@ -531,7 +535,7 @@ export default function HomeScreen() {
             <View style={styles.pronunciationHintRow}>
               <IconSymbol name="info.circle" size={13} color={colors.muted} />
               <Text style={[styles.pronunciationHintText, { color: colors.muted }]}>
-                系統會自動為中文加上拼音提示，修正人名或罕見字的發音問題
+                可輸入「誦(ㄙㄨㄥˋ)」指定讀音；括號注音不會被朗讀或顯示於回憶庫
               </Text>
             </View>
           </View>

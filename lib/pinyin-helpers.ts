@@ -14,6 +14,47 @@
 import { pinyin } from "pinyin-pro";
 
 /**
+ * 已確認會被 Qwen G2P 誤讀的園區／人名用詞。
+ * 此詞庫優先於自動姓名猜測；僅在原文真的包含詞條時才加入指令，避免干擾一般句子。
+ */
+const FORCED_PRONUNCIATION_LEXICON: ReadonlyArray<{
+  term: string;
+  pinyin: string;
+  zhuyin: string;
+}> = [
+  { term: "日日誦經", pinyin: "rì rì sòng jīng", zhuyin: "ㄖˋ ㄖˋ ㄙㄨㄥˋ ㄐㄧㄥ" },
+  { term: "祝禱加持", pinyin: "zhù dǎo jiā chí", zhuyin: "ㄓㄨˋ ㄉㄠˇ ㄐㄧㄚ ㄔˊ" },
+  { term: "蔡承諺", pinyin: "cài chéng yàn", zhuyin: "ㄘㄞˋ ㄔㄥˊ ㄧㄢˋ" },
+];
+
+/**
+ * 將使用者用於指定讀音的括號標記移除，確保注音不會被當成文字朗讀或出現在回憶庫。
+ * 支援「誦(ㄙㄨㄥˋ)」與「蔡承諺(ㄘㄞˋ ㄔㄥˊ ㄧㄢˋ)」兩種格式。
+ */
+export function stripPronunciationMarkers(text: string): string {
+  return text.replace(/([\u4e00-\u9fff]{1,8})[（(]([ㄅ-ㄩ˙ˊˇˋ\s]+)[）)]/g, "$1");
+}
+
+/** 擷取使用者明確標注的「字或詞(注音)」讀音覆寫規則。 */
+function extractManualPronunciationOverrides(text: string): Array<{ term: string; zhuyin: string }> {
+  const pattern = /([\u4e00-\u9fff]{1,8})[（(]([ㄅ-ㄩ˙ˊˇˋ\s]+)[）)]/g;
+  const overrides: Array<{ term: string; zhuyin: string }> = [];
+  for (const match of text.matchAll(pattern)) {
+    const precedingText = match[1];
+    const zhuyin = match[2].replace(/\s+/g, " ").trim();
+    // 常用格式是「日日誦(ㄙㄨㄥˋ)經」：括號只標記緊鄰的最後一個字。
+    // 若提供空格分隔且數量等於字數的多音節注音，才視為整段詞語覆寫。
+    const characters = Array.from(precedingText);
+    const syllableCount = zhuyin.split(" ").filter(Boolean).length;
+    const term = syllableCount > 1 && syllableCount === characters.length
+      ? precedingText
+      : (characters.at(-1) ?? precedingText);
+    if (term && zhuyin) overrides.push({ term, zhuyin });
+  }
+  return overrides;
+}
+
+/**
  * 偵測文字中是否包含中文字
  */
 export function containsChinese(text: string): boolean {
@@ -68,8 +109,26 @@ export function getPinyinAnnotation(text: string): string | null {
  * 3. 組合成簡潔提示字串
  */
 export function generatePronunciationHint(text: string): string | null {
-  if (!containsChinese(text)) {
+  const spokenText = stripPronunciationMarkers(text);
+  if (!containsChinese(spokenText)) {
     return null;
+  }
+
+  const rules: string[] = [];
+  const coveredTerms = new Set<string>();
+
+  // 1. 先處理使用者手動指定的注音；這是最高優先權規則。
+  for (const override of extractManualPronunciationOverrides(text)) {
+    rules.push(`「${override.term}」固定讀作「${override.zhuyin}」`);
+    coveredTerms.add(override.term);
+  }
+
+  // 2. 再套用已驗證的詞庫，避免 Qwen 對罕見字或人名自行猜音。
+  for (const entry of FORCED_PRONUNCIATION_LEXICON) {
+    if (spokenText.includes(entry.term) && !coveredTerms.has(entry.term)) {
+      rules.push(`「${entry.term}」讀作「${entry.pinyin}」`);
+      coveredTerms.add(entry.term);
+    }
   }
 
   // 台灣常見姓氏。這裡刻意採保守策略；沒有足夠把握時寧可不加提示，
@@ -81,28 +140,24 @@ export function generatePronunciationHint(text: string): string | null {
     `(?:^|[，。！？、；：\\s]|我是|我叫|名叫|叫做|姓名是|名字是|的)([${commonSurnames}][\\u4e00-\\u9fff]{1,2})`,
     "g",
   );
-  const candidates = Array.from(text.matchAll(namePattern), (match) => match[1]);
+  const candidates = Array.from(spokenText.matchAll(namePattern), (match) => match[1]);
   const names = [...new Set(candidates)].slice(0, 2);
-
-  if (names.length === 0) {
-    return null;
-  }
 
   const annotations: string[] = [];
   for (const name of names) {
+    if (coveredTerms.has(name)) continue;
     const pinyinStr = getPinyinAnnotation(name);
     if (pinyinStr) {
-      annotations.push(`${name}=${pinyinStr}`);
+      annotations.push(`「${name}」讀作「${pinyinStr}」`);
     }
   }
+  rules.push(...annotations);
 
-  if (annotations.length === 0) {
+  if (rules.length === 0) {
     return null;
   }
 
-  // 簡潔提示：只標注拼音，不加多餘描述
-  const hint = `人名發音：${annotations.join("、")}`;
-  return hint;
+  return `【強制讀音規則】${rules.join("；")}。以上規則優先於模型預設發音；只朗讀原文，不朗讀括號、注音或拼音標記`;
 }
 
 /**

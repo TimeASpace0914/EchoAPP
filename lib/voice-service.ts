@@ -9,7 +9,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
-import { appendPronunciationHint } from "@/lib/pinyin-helpers";
+import { appendPronunciationHint, stripPronunciationMarkers } from "@/lib/pinyin-helpers";
 
 /**
  * 建立帶超時的 AbortSignal（相容舊版裝置不支援 AbortSignal.timeout）
@@ -470,6 +470,9 @@ export async function generateSpeech(
   const outputPath = `${AUDIO_DIR}${fileName}`;
 
   const { onProgress } = params;
+  // 原輸入可含「字(注音)」覆寫標記：保留它用來產生 instruct，
+  // 但實際送往 TTS 與保存的朗讀內容必須移除標記。
+  const spokenText = stripPronunciationMarkers(params.text);
   // 將同一份精簡風格同時交給 Profile 與生成任務，避免兩階段風格不一致。
   const stableInstruct = buildStableVoiceInstruct(params.instruct, params.emotion);
 
@@ -549,7 +552,7 @@ export async function generateSpeech(
   // 解決 G2P 模型將「蔡承諺」錯誤映射為「蔡懲罰」等發音問題
   finalInstruct = appendPronunciationHint(finalInstruct, params.text);
 
-  const result = await restGenerateSpeech(params.text, voiceProfileId, {
+  const result = await restGenerateSpeech(spokenText, voiceProfileId, {
     language: params.language,
     instruct: finalInstruct,
     engine: params.engine || "qwen",
@@ -575,7 +578,7 @@ export async function generateSpeech(
 
   if (onProgress) onProgress(100, "完成");
 
-  const estimatedDuration = result.duration ?? Math.max(2, Math.ceil(params.text.length * 0.15));
+  const estimatedDuration = result.duration ?? Math.max(2, Math.ceil(spokenText.length * 0.15));
 
   return {
     audioUri: outputPath,
