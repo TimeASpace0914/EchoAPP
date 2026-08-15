@@ -46,16 +46,16 @@ const MAX_TEXT_LENGTH = 500;
 
 /** 情緒選項（對應 Voicebox instruct 中的情緒描述） */
 const EMOTION_OPTIONS = [
-  { label: "溫柔", value: "溫柔深情，語調柔和" },
-  { label: "開心", value: "開心喜悅，語調高昂" },
-  { label: "平靜", value: "平靜安穩，語調沉穩" },
-  { label: "關心", value: "關心牽掛，語調真摯" },
-  { label: "緩慢", value: "緩慢柔和，拖長音" },
-  { label: "慈祥", value: "慈祥溫暖，長輩慈愛" },
-  { label: "思念", value: "思念哀傷，語調低沉" },
-  { label: "鼓勵", value: "鼓勵振奮，語調有力" },
-  { label: "激昂", value: "激昂熱血，語調高亢" },
-  { label: "生氣", value: "生氣憤怒，語調壓迫" },
+  { label: "溫柔", value: "溫柔深情，聲線柔軟，句尾微微放慢，讓關懷清楚可聽見" },
+  { label: "開心", value: "開心喜悅，聲音明亮有笑意，節奏輕快自然" },
+  { label: "平靜", value: "平靜安穩，呼吸穩定，語速從容，情緒不起伏過大" },
+  { label: "關心", value: "關心牽掛，語氣真摯，重點字清楚而帶有體貼感" },
+  { label: "緩慢", value: "緩慢柔和，明顯放慢節奏，每個字咬字清楚" },
+  { label: "慈祥", value: "慈祥溫暖，如長輩親切叮嚀，聲線厚實安定" },
+  { label: "思念", value: "思念感傷，情緒含蓄低迴，句尾帶有不捨但不哭腔" },
+  { label: "鼓勵", value: "鼓勵振奮，語氣堅定有力量，讓人感到被支持" },
+  { label: "激昂", value: "激昂熱血，音量與起伏明顯，節奏有推進感" },
+  { label: "生氣", value: "生氣憤怒，語氣壓低且有力度，咬字短促明確" },
 ] as const;
 
 export default function HomeScreen() {
@@ -78,7 +78,7 @@ export default function HomeScreen() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
   const [speed, setSpeed] = useState(1.0);
-  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
 
   // 首頁淡入過場動畫
@@ -224,9 +224,8 @@ export default function HomeScreen() {
     const spokenText = stripPronunciationMarkers(text.trim());
 
     try {
-      // UI 保留多選亮起供使用者比較，但語音模型只接受最後選擇的一個「主情緒」，
-      // 避免同時傳入溫柔、激昂、悲傷等互斥描述造成聲音與口音不穩定。
-      const primaryEmotion = selectedEmotions.at(-1);
+      // 一次只傳入一個主情緒，讓模型有明確的表達方向。
+      const primaryEmotion = selectedEmotion || undefined;
       const result = await generateSpeech({
         referenceAudioUri: audioUri,
         text: text.trim(),
@@ -295,7 +294,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, referenceText, speed, selectedEmotions, isGenerating]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, referenceText, speed, selectedEmotion, isGenerating]);
 
   // 生成計時器
   useEffect(() => {
@@ -563,12 +562,12 @@ export default function HomeScreen() {
           {showAdvanced && (
             <View style={styles.personalityBody}>
               <Text style={[styles.personalityHint, { color: colors.muted }]}> 
-                可多選比較；生成時會以最後選擇的一個作為主情緒，避免互斥語氣混入
+                選擇一種主情緒，再用下方提示補充細節；一次只會套用一種情緒
               </Text>
               {/* 情緒標籤 */}
               <View style={styles.emotionSelectorRow}>
                 {EMOTION_OPTIONS.map((emo) => {
-                  const isSelected = selectedEmotions.includes(emo.value);
+                  const isSelected = selectedEmotion === emo.value;
                   return (
                     <TouchableOpacity
                       key={emo.value}
@@ -576,11 +575,7 @@ export default function HomeScreen() {
                         if (Platform.OS !== "web") {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }
-                        setSelectedEmotions(prev =>
-                          isSelected
-                            ? prev.filter(v => v !== emo.value)
-                            : [...prev, emo.value]
-                        );
+                        setSelectedEmotion(isSelected ? null : emo.value);
                       }}
                       style={[
                         styles.emotionChip,
@@ -613,7 +608,7 @@ export default function HomeScreen() {
                 ]}
                 value={personality}
                 onChangeText={setPersonality}
-                placeholder="例如：像在跟家人聊天，語助詞要自然"
+                placeholder="自訂補充：例如帶一點笑意，但不要太誇張"
                 placeholderTextColor={colors.muted}
                 multiline
                 maxLength={100}

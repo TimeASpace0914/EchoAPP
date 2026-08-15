@@ -250,8 +250,10 @@ async function readAudioAsBase64(uri: string): Promise<string> {
 function buildStableVoiceInstruct(personality?: string, primaryEmotion?: string): string {
   const parts: string[] = [];
   const trimmedPersonality = personality?.trim();
-  if (trimmedPersonality) parts.push(trimmedPersonality);
-  if (primaryEmotion) parts.push(`主要情緒：${primaryEmotion}`);
+  if (primaryEmotion) {
+    parts.push(`唯一主情緒：${primaryEmotion}。請讓此情緒在語速、重音與句尾中清楚表現，但仍維持自然對話感`);
+  }
+  if (trimmedPersonality) parts.push(`自訂補充：${trimmedPersonality}`);
   parts.push("使用自然的台灣國語口吻，依原文自然停頓與表達，不刻意添加語助詞");
   return parts.join("。\n");
 }

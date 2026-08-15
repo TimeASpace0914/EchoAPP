@@ -292,7 +292,7 @@ export default function HistoryScreen() {
               onPress={() => handlePlay(item)}
               style={[styles.entryPlayButton, { backgroundColor: colors.primary }]}
             >
-              <IconSymbol name="play.fill" size={16} color="#FFFFFF" />
+              <IconSymbol name="play.fill" size={16} color={colors.background} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleDownloadEntry(item)}

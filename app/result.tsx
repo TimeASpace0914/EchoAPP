@@ -688,7 +688,7 @@ export default function ResultScreen() {
                 activeOpacity={0.7}
                 style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
-                <Text style={styles.modalButtonTextActive}>添加</Text>
+                <Text style={[styles.modalButtonTextActive, { color: colors.background }]}>添加</Text>
               </TouchableOpacity>
             </View>
           </View>
