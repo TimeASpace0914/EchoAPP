@@ -10,6 +10,43 @@ import { createContext } from "./context";
 import { checkVoiceboxHealth, uploadVoiceProfile, generateVoiceboxSpeech } from "../voicebox";
 import { storagePut } from "../storage";
 
+type VoiceboxGenerationJob = {
+  id: string;
+  status: "queued" | "generating" | "completed" | "failed";
+  profileId: string;
+  text: string;
+  createdAt: number;
+  updatedAt: number;
+  audioBase64?: string;
+  duration?: number | null;
+  error?: string;
+  details?: string;
+};
+
+const voiceboxGenerationJobs = new Map<string, VoiceboxGenerationJob>();
+const JOB_RETENTION_MS = 30 * 60 * 1000;
+
+function pruneVoiceboxJobs() {
+  const cutoff = Date.now() - JOB_RETENTION_MS;
+  for (const [id, job] of voiceboxGenerationJobs) {
+    if (job.updatedAt < cutoff) voiceboxGenerationJobs.delete(id);
+  }
+}
+
+function publicVoiceboxJob(job: VoiceboxGenerationJob) {
+  return {
+    success: true,
+    jobId: job.id,
+    status: job.status,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    ...(job.status === "completed" && job.audioBase64
+      ? { audioBase64: job.audioBase64, duration: job.duration ?? null, storageUrl: null }
+      : {}),
+    ...(job.status === "failed" ? { error: job.error, details: job.details } : {}),
+  };
+}
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -144,6 +181,85 @@ async function startServer() {
     } catch (error) {
       res.status(500).json({ success: false, error: error instanceof Error ? error.message : "未知錯誤" });
     }
+  });
+
+  // 非同步生成任務：Cloudflare、Expo 開發代理等中介層可能在 CPU 推論完成前
+  // 關閉長時間 HTTP 請求（504）。此端點只負責建立工作並立即回傳；實際推論在
+  // 背景進行，APP 以短連線輪詢下方的 job 狀態端點。
+  app.post("/api/voicebox/generate-jobs", (req, res) => {
+    const { text, profileId, speed, language, instruct, engine, seed } = req.body as {
+      text: string;
+      profileId: string;
+      speed?: number;
+      language?: string;
+      instruct?: string;
+      engine?: string;
+      seed?: number;
+    };
+
+    if (!text || !profileId) {
+      res.status(400).json({ success: false, error: "缺少必要參數 text 或 profileId" });
+      return;
+    }
+
+    pruneVoiceboxJobs();
+    const job: VoiceboxGenerationJob = {
+      id: crypto.randomUUID(),
+      status: "queued",
+      profileId,
+      text,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    voiceboxGenerationJobs.set(job.id, job);
+    res.status(202).json(publicVoiceboxJob(job));
+
+    void (async () => {
+      job.status = "generating";
+      job.updatedAt = Date.now();
+      console.log(`[Voicebox] Background generation job ${job.id} started for profile ${profileId}`);
+
+      try {
+        const result = await generateVoiceboxSpeech({
+          text,
+          profile_id: profileId,
+          engine: engine || "qwen",
+          ...(speed !== undefined && { speed }),
+          ...(language && { language }),
+          ...(instruct && { instruct }),
+          ...(seed !== undefined && { seed }),
+        });
+
+        if ("error" in result) {
+          job.status = "failed";
+          job.error = result.error;
+          job.details = result.details;
+          console.error(`[Voicebox] Background job ${job.id} failed: ${result.error}`, result.details);
+        } else {
+          job.status = "completed";
+          job.audioBase64 = result.audio;
+          job.duration = result.duration ?? null;
+          console.log(`[Voicebox] Background job ${job.id} completed`);
+          storagePut(`voice-clone/${Date.now()}.wav`, Buffer.from(result.audio, "base64"), "audio/wav").catch(() => {});
+        }
+      } catch (error) {
+        job.status = "failed";
+        job.error = "背景語音生成發生未預期錯誤";
+        job.details = error instanceof Error ? error.message : String(error);
+        console.error(`[Voicebox] Background job ${job.id} crashed:`, error);
+      } finally {
+        job.updatedAt = Date.now();
+      }
+    })();
+  });
+
+  app.get("/api/voicebox/generate-jobs/:jobId", (req, res) => {
+    const job = voiceboxGenerationJobs.get(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ success: false, error: "找不到生成任務；伺服器可能已重新啟動" });
+      return;
+    }
+    res.json(publicVoiceboxJob(job));
   });
 
   app.use(

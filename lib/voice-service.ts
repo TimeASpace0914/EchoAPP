@@ -324,7 +324,7 @@ async function restGenerateSpeech(
   const apiBase = getApiBaseUrl();
   let response: Response;
   try {
-    response = await fetch(`${apiBase}/api/voicebox/generate`, {
+    response = await fetch(`${apiBase}/api/voicebox/generate-jobs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -338,12 +338,13 @@ async function restGenerateSpeech(
         ...(options?.speed !== undefined && { speed: options.speed }),
         ...(options?.seed !== undefined && { seed: options.seed }),
       }),
-      signal: createTimeoutSignal(600000),
+      // 僅等待伺服器建立背景工作；不等待 CPU 推論，避免中介層產生 HTTP 504。
+      signal: createTimeoutSignal(30000),
     });
   } catch (err) {
     throw new Error(
       err instanceof Error && (err.name === "TimeoutError" || err.message.includes("abort"))
-        ? "語音生成逾時（超過 10 分鐘），請縮短文字後再試。"
+        ? "建立語音生成工作逾時，請確認伺服器連線後再試。"
         : `無法連接伺服器：${err instanceof Error ? err.message : "未知錯誤"}`
     );
   }
@@ -357,22 +358,64 @@ async function restGenerateSpeech(
 
   const data = await response.json() as {
     success?: boolean;
+    jobId?: string;
+    status?: string;
     audioBase64?: string;
     duration?: number;
     storageUrl?: string;
     error?: string;
   };
 
-  if (data.success && data.audioBase64) {
-    return {
-      audioBase64: data.audioBase64,
-      duration: data.duration ?? null,
-      storageUrl: data.storageUrl ?? null,
-    };
+  if (!data.success || !data.jobId) {
+    throw new Error(data.error || "伺服器未返回生成工作 ID，請確認 Voicebox 伺服器正常運作。");
   }
-  throw new Error(
-    data.error || "伺服器未返回音檔，請確認 Voicebox 伺服器正常運作。"
-  );
+
+  const maxPolls = 180;
+  for (let attempt = 0; attempt < maxPolls; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const jobResponse = await fetch(`${apiBase}/api/voicebox/generate-jobs/${data.jobId}`, {
+        signal: createTimeoutSignal(20000),
+      });
+      const job = await jobResponse.json().catch(() => ({})) as {
+        success?: boolean;
+        status?: string;
+        audioBase64?: string;
+        duration?: number | null;
+        storageUrl?: string | null;
+        error?: string;
+        details?: string;
+      };
+
+      if (!jobResponse.ok || !job.success) {
+        const details = job.details ? `（${job.details}）` : "";
+        throw new Error(`${job.error || "讀取生成工作狀態失敗"}${details}`);
+      }
+
+      if (job.status === "completed" && job.audioBase64) {
+        return {
+          audioBase64: job.audioBase64,
+          duration: job.duration ?? null,
+          storageUrl: job.storageUrl ?? null,
+        };
+      }
+
+      if (job.status === "failed") {
+        const details = job.details ? `（${job.details}）` : "";
+        throw new Error(`語音生成失敗：${job.error || "Voicebox 回報失敗"}${details}`);
+      }
+    } catch (error) {
+      // 短暫網路抖動不應中斷已在本機執行的任務；明確的工作失敗則立即回報。
+      if (error instanceof Error && error.message.startsWith("語音生成失敗：")) {
+        throw error;
+      }
+      if (attempt === maxPolls - 1) {
+        throw new Error(`語音生成逾時（超過 6 分鐘）：${error instanceof Error ? error.message : "無法取得工作狀態"}`);
+      }
+    }
+  }
+
+  throw new Error("語音生成逾時（超過 6 分鐘），請稍後到回憶庫確認結果。");
 }
 
 /**
