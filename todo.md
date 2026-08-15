@@ -367,5 +367,9 @@
 - [x] 確認 Windows PowerShell 錯誤僅因診斷腳本尚未下載至目前目錄
 - [x] 分析已收到的 Windows Voicebox 詳細診斷輸出
 - [x] 建立即時 DEBUG 日誌重現腳本與修復指引
+- [ ] 協助 Windows 主機下載並定位 DEBUG 腳本後執行
+- [x] 驗證本機 17493 與 Cloudflare Tunnel 公開端點的雙向連通性
+- [x] 加入已接受長時間生成任務的 HTTP 504 容錯與輪詢復原邏輯
+- [ ] 在 Cloudflare Tunnel 下實測新生成不再因 HTTP 504 被 APP 誤判失敗
 - [ ] 在本機 Windows Voicebox 執行 DEBUG 重現並取得完整堆疊
 - [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構

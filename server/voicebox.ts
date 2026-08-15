@@ -165,6 +165,44 @@ async function fetchWithRetry(
   throw lastError!;
 }
 
+/**
+ * Voicebox 會先建立 history 記錄，再執行耗時的 CPU 推論。經由 Cloudflare Tunnel 時，
+ * /generate 的同步回應可能先被 504 中斷，但任務其實已經在本機開始執行。因每次 APP
+ * 生成都會建立新 Profile，profile_id 可安全識別這一筆剛被接受的生成任務。
+ */
+async function recoverAcceptedGenerationId(
+  baseUrl: string,
+  profileId: string,
+  text: string,
+): Promise<string | null> {
+  try {
+    const historyRes = await fetchWithRetry(`${baseUrl}/history?limit=20`, {
+      headers: NGROK_HEADERS,
+    }, 15000, 0);
+
+    if (!historyRes.ok) return null;
+
+    const payload = await historyRes.json() as {
+      items?: Array<{ id?: string; profile_id?: string; text?: string; status?: string }>;
+    };
+    const match = payload.items?.find((entry) =>
+      entry.id &&
+      entry.profile_id === profileId &&
+      entry.text === text &&
+      entry.status !== "failed",
+    );
+
+    return match?.id ?? null;
+  } catch (error) {
+    console.warn(
+      `[Voicebox] Could not recover accepted generation after gateway timeout: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return null;
+  }
+}
+
 export type VoiceboxProfile = {
   id: string;
   name: string;
@@ -390,6 +428,8 @@ export async function generateVoiceboxSpeech(
   // 步驟 1：啟動生成
   let generationId: string;
   try {
+    // 不重試 POST /generate：若 Tunnel 在 Voicebox 已接收任務後才回傳 504，重試會建立
+    // 重複的耗時生成任務。下方會改以 profile_id 從 history 找回已接受的任務。
     const genRes = await fetchWithRetry(`${baseUrl}/generate`, {
       method: "POST",
       headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
@@ -402,19 +442,31 @@ export async function generateVoiceboxSpeech(
         ...(request.engine && { engine: request.engine }),
         ...(request.seed !== undefined && { seed: request.seed }),
       }),
-    }, 60000, 2);
+    }, 90000, 0);
 
     if (!genRes.ok) {
       const errText = await genRes.text().catch(() => "");
+      const recoveredGenerationId =
+        genRes.status === 504 || genRes.status === 522 || genRes.status === 524
+          ? await recoverAcceptedGenerationId(baseUrl, request.profile_id, request.text)
+          : null;
+
+      if (recoveredGenerationId) {
+        console.warn(
+          `[Voicebox] /generate returned HTTP ${genRes.status}, but recovered accepted task ${recoveredGenerationId} from history`,
+        );
+        generationId = recoveredGenerationId;
+      } else {
       return {
         error: "啟動語音生成失敗",
         code: "GENERATION_FAILED",
         details: `HTTP ${genRes.status}: ${errText}`,
       };
+      }
+    } else {
+      const genResult = await genRes.json() as { id: string; status: string };
+      generationId = genResult.id;
     }
-
-    const genResult = await genRes.json() as { id: string; status: string };
-    generationId = genResult.id;
   } catch (error) {
     return {
       error: "無法連線至 Voicebox 服務（啟動生成時）",
