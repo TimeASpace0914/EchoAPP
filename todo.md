@@ -371,5 +371,10 @@
 - [x] 驗證本機 17493 與 Cloudflare Tunnel 公開端點的雙向連通性
 - [x] 加入已接受長時間生成任務的 HTTP 504 容錯與輪詢復原邏輯
 - [ ] 在 Cloudflare Tunnel 下實測新生成不再因 HTTP 504 被 APP 誤判失敗
+- [x] 比對最佳 Profile echo_1784189162110 與目前 Profile 的樣本、參考文字及生成設定
+- [ ] 加入最佳 Profile 重用與參考文字品質檢查，避免每次生成重新建立低品質樣本
+- [x] 比對歷史成功生成的情緒、Profile 個性、語速及 instruct 拼接邏輯
+- [x] 統合 Profile 個性與生成指令、限制主情緒，避免互斥情緒混入
+- [x] 限制自動拼音提示為疑似姓名，避免一般片語干擾台灣口吻
 - [ ] 在本機 Windows Voicebox 執行 DEBUG 重現並取得完整堆疊
 - [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構

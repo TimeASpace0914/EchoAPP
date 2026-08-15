@@ -63,36 +63,36 @@ export function getPinyinAnnotation(text: string): string | null {
  * 為輸入文字產生發音提示字串，可附加到 instruct 參數中
  *
  * 策略：
- * 1. 提取文字中所有連續中文字片段（≥2字）
- * 2. 只標注較長的片段（≥3字），避免常見詞彙佔用提示空間
+ * 1. 只辨識「常見姓氏 + 1~2 個姓名字」的疑似中文姓名
+ * 2. 不替一般片語、標語或完整句子加入拼音，避免干擾語句韻律
  * 3. 組合成簡潔提示字串
- *
- * 為避免提示過長，最多只標注前 2 個片段
  */
 export function generatePronunciationHint(text: string): string | null {
   if (!containsChinese(text)) {
     return null;
   }
 
-  const segments = extractChineseSegments(text);
-  if (segments.length === 0) {
-    return null;
-  }
+  // 台灣常見姓氏。這裡刻意採保守策略；沒有足夠把握時寧可不加提示，
+  // 也不要把「十方福報」等一般片語誤當成人名，破壞模型的自然節奏。
+  const commonSurnames = "陳林黃張李王吳劉蔡楊許鄭謝郭洪邱曾廖賴徐周葉蘇莊呂江何蕭羅高潘簡朱鍾彭游詹胡施沈余趙梁柯翁魏孫戴范宋方鄧杜傅侯曹薛丁溫紀";
+  // 中文沒有天然斷詞，不能單靠「姓氏 + 兩個字」猜測人名；例如「十方福報」
+  // 會被錯認為「方福報」。因此只接受句首、標點之後或姓名引導詞之後的候選字串。
+  const namePattern = new RegExp(
+    `(?:^|[，。！？、；：\\s]|我是|我叫|名叫|叫做|姓名是|名字是|的)([${commonSurnames}][\\u4e00-\\u9fff]{1,2})`,
+    "g",
+  );
+  const candidates = Array.from(text.matchAll(namePattern), (match) => match[1]);
+  const names = [...new Set(candidates)].slice(0, 2);
 
-  // 只標注 ≥3 字的片段（通常是人名、專有名詞），避免常見短詞
-  const longSegments = segments.filter((s) => s.length >= 3);
-  // 最多 2 個片段，保持 instruct 簡潔
-  const segmentsToAnnotate = longSegments.slice(0, 2);
-
-  if (segmentsToAnnotate.length === 0) {
+  if (names.length === 0) {
     return null;
   }
 
   const annotations: string[] = [];
-  for (const segment of segmentsToAnnotate) {
-    const pinyinStr = getPinyinAnnotation(segment);
+  for (const name of names) {
+    const pinyinStr = getPinyinAnnotation(name);
     if (pinyinStr) {
-      annotations.push(`${segment}=${pinyinStr}`);
+      annotations.push(`${name}=${pinyinStr}`);
     }
   }
 

@@ -62,12 +62,17 @@ describe("generatePronunciationHint", () => {
     expect(hint).toContain("人名發音");
   });
 
+  it("should not annotate ordinary Chinese phrases as names", () => {
+    expect(generatePronunciationHint("十方福報陪伴每一份思念")).toBeNull();
+    expect(generatePronunciationHint("今天天氣很好，祝福大家平安順心")).toBeNull();
+  });
+
   it("should return null for non-Chinese text", () => {
     expect(generatePronunciationHint("Hello World")).toBeNull();
   });
 
-  it("should limit to 2 segments max", () => {
-    const longText = "今天天氣很好明天也不錯後天可能下雨大後天會放晴最後一天放假";
+  it("should limit to 2 detected names max", () => {
+    const longText = "蔡承諺與陳小明、林大華一起參加活動";
     const hint = generatePronunciationHint(longText);
     expect(hint).not.toBeNull();
     // Should not contain more than 2 annotations

@@ -238,6 +238,20 @@ async function readAudioAsBase64(uri: string): Promise<string> {
   return base64;
 }
 
+/**
+ * 將「Profile 個性」與「本次生成情緒」統合成一組短且不互相打架的指令。
+ * 同一份基礎指令會同時用於建立 Profile 與生成，避免 Profile 是一種風格、
+ * 生成時又被另一組冗長情緒覆蓋。情緒由首頁保證只傳入一個主情緒。
+ */
+function buildStableVoiceInstruct(personality?: string, primaryEmotion?: string): string {
+  const parts: string[] = [];
+  const trimmedPersonality = personality?.trim();
+  if (trimmedPersonality) parts.push(trimmedPersonality);
+  if (primaryEmotion) parts.push(`主要情緒：${primaryEmotion}`);
+  parts.push("使用自然的台灣國語口吻，依原文自然停頓與表達，不刻意添加語助詞");
+  return parts.join("。\n");
+}
+
 // ─── REST API 呼叫函數 ──────────────────────────────────────────────
 
 /**
@@ -411,6 +425,8 @@ export async function generateSpeech(
   const outputPath = `${AUDIO_DIR}${fileName}`;
 
   const { onProgress } = params;
+  // 將同一份精簡風格同時交給 Profile 與生成任務，避免兩階段風格不一致。
+  const stableInstruct = buildStableVoiceInstruct(params.instruct, params.emotion);
 
   // 階段 1：讀取參考音檔
   if (onProgress) onProgress(5, "正在讀取參考音檔...");
@@ -441,7 +457,7 @@ export async function generateSpeech(
         audioBase64,
         mimeType,
         params.referenceText,
-        params.instruct,  // personality → Voicebox profile personality
+        stableInstruct,  // personality → Voicebox profile personality
         params.description,  // description → Voicebox profile name (可選)
       );
       voiceProfileId = uploadResult?.profileId ?? undefined;
@@ -482,18 +498,7 @@ export async function generateSpeech(
   }, 4000);
   // 使用 qwen 引擎（Qwen-TTS 語音克隆效果最佳，能仿製聲音特徵）
   // 關鍵：確保 reference_text 是真實轉錄而非假文字，避免胡言亂語
-  // 台灣口吻優化：在 instruct 中加入台灣國語語助詞提示
-  let finalInstruct = params.instruct || "";
-  if (params.emotion) {
-    // 簡潔情緒提示：直接用關鍵詞引導語調
-    finalInstruct = finalInstruct
-      ? `${finalInstruct}。語氣：${params.emotion}`
-      : `語氣：${params.emotion}`;
-  }
-  // 簡潔台灣口吻提示
-  finalInstruct = finalInstruct
-    ? `${finalInstruct}。台灣國語口吻`
-    : "台灣國語口吻";
+  let finalInstruct = stableInstruct;
 
   // 自動加入中文發音提示：偵測文字中的中文字，為罕見字/人名加上拼音標注
   // 解決 G2P 模型將「蔡承諺」錯誤映射為「蔡懲罰」等發音問題

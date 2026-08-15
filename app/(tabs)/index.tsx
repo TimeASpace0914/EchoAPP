@@ -220,6 +220,9 @@ export default function HomeScreen() {
     generationStore.startGeneration();
 
     try {
+      // UI 保留多選亮起供使用者比較，但語音模型只接受最後選擇的一個「主情緒」，
+      // 避免同時傳入溫柔、激昂、悲傷等互斥描述造成聲音與口音不穩定。
+      const primaryEmotion = selectedEmotions.at(-1);
       const result = await generateSpeech({
         referenceAudioUri: audioUri,
         text: text.trim(),
@@ -230,7 +233,7 @@ export default function HomeScreen() {
         description: voiceDescription.trim() || undefined,
         referenceText: referenceText.trim() || undefined,
         speed: speed !== 1.0 ? speed : undefined,
-        emotion: selectedEmotions.length > 0 ? selectedEmotions.join("、") : undefined,
+        emotion: primaryEmotion,
         onProgress: (progress, stage) => {
           setGenProgress(progress);
           setGenStage(stage);
@@ -246,7 +249,7 @@ export default function HomeScreen() {
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
-        emotion: selectedEmotions.length > 0 ? selectedEmotions.join("、") : undefined,
+        emotion: primaryEmotion,
         speed: speed !== 1.0 ? speed : undefined,
       };
       await saveHistoryEntry(entry);
@@ -555,8 +558,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
           {showAdvanced && (
             <View style={styles.personalityBody}>
-              <Text style={[styles.personalityHint, { color: colors.muted }]}>
-                選擇情緒標籤或自行描述希望親友說話時的語氣與情感
+              <Text style={[styles.personalityHint, { color: colors.muted }]}> 
+                可多選比較；生成時會以最後選擇的一個作為主情緒，避免互斥語氣混入
               </Text>
               {/* 情緒標籤 */}
               <View style={styles.emotionSelectorRow}>
