@@ -9,7 +9,11 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
-import { appendPronunciationHint, stripPronunciationMarkers } from "@/lib/pinyin-helpers";
+import {
+  appendPronunciationHint,
+  createPhoneticSurrogateText,
+  stripPronunciationMarkers,
+} from "@/lib/pinyin-helpers";
 
 /**
  * 建立帶超時的 AbortSignal（相容舊版裝置不支援 AbortSignal.timeout）
@@ -473,6 +477,8 @@ export async function generateSpeech(
   // 原輸入可含「字(注音)」覆寫標記：保留它用來產生 instruct，
   // 但實際送往 TTS 與保存的朗讀內容必須移除標記。
   const spokenText = stripPronunciationMarkers(params.text);
+  // 僅傳入 Qwen 的同音代理文字；客戶可見資料一律使用 spokenText 原始正字。
+  const synthesisText = createPhoneticSurrogateText(params.text);
   // 將同一份精簡風格同時交給 Profile 與生成任務，避免兩階段風格不一致。
   const stableInstruct = buildStableVoiceInstruct(params.instruct, params.emotion);
 
@@ -552,7 +558,7 @@ export async function generateSpeech(
   // 解決 G2P 模型將「蔡承諺」錯誤映射為「蔡懲罰」等發音問題
   finalInstruct = appendPronunciationHint(finalInstruct, params.text);
 
-  const result = await restGenerateSpeech(spokenText, voiceProfileId, {
+  const result = await restGenerateSpeech(synthesisText, voiceProfileId, {
     language: params.language,
     instruct: finalInstruct,
     engine: params.engine || "qwen",

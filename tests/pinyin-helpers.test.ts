@@ -5,6 +5,7 @@ import {
   getPinyinAnnotation,
   generatePronunciationHint,
   appendPronunciationHint,
+  createPhoneticSurrogateText,
   stripPronunciationMarkers,
 } from "../lib/pinyin-helpers";
 
@@ -118,16 +119,21 @@ describe("強制讀音詞庫與手動注音覆寫", () => {
 
   it("should honor manual zhuyin overrides", () => {
     const hint = generatePronunciationHint("日日誦(ㄙㄨㄥˋ)經，祝禱(ㄉㄠˇ)加持");
-    expect(hint).toContain("「誦」固定讀作「ㄙㄨㄥˋ」");
-    expect(hint).toContain("「禱」固定讀作「ㄉㄠˇ」");
+    expect(hint).toContain("「誦」固定讀作「ㄙㄨㄥˋ（sòng）」");
+    expect(hint).toContain("「禱」固定讀作「ㄉㄠˇ（dǎo）」");
   });
 
   it("should treat a single zhuyin annotation as the immediately preceding character", () => {
     const hint = generatePronunciationHint("蔡承諺(ㄧㄢˋ)歡迎您");
-    expect(hint).toContain("「諺」固定讀作「ㄧㄢˋ」");
+    expect(hint).toContain("「諺」固定讀作「ㄧㄢˋ（yàn）」");
   });
 
   it("should remove markers from the customer-visible spoken text", () => {
     expect(stripPronunciationMarkers("日日誦(ㄙㄨㄥˋ)經，蔡承諺(ㄧㄢˋ)")).toBe("日日誦經，蔡承諺");
+  });
+
+  it("should use tested homophone proxies only for the Qwen synthesis text", () => {
+    expect(createPhoneticSurrogateText("日日誦(ㄙㄨㄥˋ)經，祝禱(ㄉㄠˇ)加持，蔡承諺(ㄧㄢˋ)"))
+      .toBe("日日送經，祝島加持，菜成燕");
   });
 });

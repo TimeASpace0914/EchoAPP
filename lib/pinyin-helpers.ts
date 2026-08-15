@@ -27,12 +27,42 @@ const FORCED_PRONUNCIATION_LEXICON: ReadonlyArray<{
   { term: "蔡承諺", pinyin: "cài chéng yàn", zhuyin: "ㄘㄞˋ ㄔㄥˊ ㄧㄢˋ" },
 ];
 
+/** 已知注音到拼音的精準對照，只供使用者標注的三個易錯字使用。 */
+const KNOWN_MANUAL_PRONUNCIATIONS: Readonly<Record<string, { pinyin: string; zhuyin: string }>> = {
+  誦: { pinyin: "sòng", zhuyin: "ㄙㄨㄥˋ" },
+  禱: { pinyin: "dǎo", zhuyin: "ㄉㄠˇ" },
+  諺: { pinyin: "yàn", zhuyin: "ㄧㄢˋ" },
+};
+
+/**
+ * Qwen Base 的 instruction control 無法可靠覆寫罕見中文字的 G2P。
+ * 下列代理字皆為日常常用、且與原字同音同調；只在送往 TTS 前暫時替換，
+ * UI、回憶庫與結果頁仍保留原始正字。此映射已以 Voicebox 實測回讀驗證。
+ */
+const PHONETIC_SURROGATE_LEXICON: ReadonlyArray<{ source: string; surrogate: string }> = [
+  { source: "日日誦經", surrogate: "日日送經" },
+  { source: "祝禱加持", surrogate: "祝島加持" },
+  { source: "蔡承諺", surrogate: "菜成燕" },
+];
+
 /**
  * 將使用者用於指定讀音的括號標記移除，確保注音不會被當成文字朗讀或出現在回憶庫。
  * 支援「誦(ㄙㄨㄥˋ)」與「蔡承諺(ㄘㄞˋ ㄔㄥˊ ㄧㄢˋ)」兩種格式。
  */
 export function stripPronunciationMarkers(text: string): string {
   return text.replace(/([\u4e00-\u9fff]{1,8})[（(]([ㄅ-ㄩ˙ˊˇˋ\s]+)[）)]/g, "$1");
+}
+
+/**
+ * 建立只供 Qwen 合成使用的同音代理文字。
+ * 因 Base 克隆模型無可靠的單字音素覆寫介面，這是目前可重現的正確發音做法。
+ */
+export function createPhoneticSurrogateText(text: string): string {
+  let synthesisText = stripPronunciationMarkers(text);
+  for (const { source, surrogate } of PHONETIC_SURROGATE_LEXICON) {
+    synthesisText = synthesisText.split(source).join(surrogate);
+  }
+  return synthesisText;
 }
 
 /** 擷取使用者明確標注的「字或詞(注音)」讀音覆寫規則。 */
@@ -119,7 +149,11 @@ export function generatePronunciationHint(text: string): string | null {
 
   // 1. 先處理使用者手動指定的注音；這是最高優先權規則。
   for (const override of extractManualPronunciationOverrides(text)) {
-    rules.push(`「${override.term}」固定讀作「${override.zhuyin}」`);
+    const known = KNOWN_MANUAL_PRONUNCIATIONS[override.term];
+    const pronunciation = known && known.zhuyin === override.zhuyin
+      ? `${known.zhuyin}（${known.pinyin}）`
+      : override.zhuyin;
+    rules.push(`「${override.term}」固定讀作「${pronunciation}」`);
     coveredTerms.add(override.term);
   }
 
