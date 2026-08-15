@@ -361,7 +361,11 @@
 ## Voicebox Qwen 推論錯誤修復
 
 - [x] 診斷 `Unexpected result type: list, is_tensor=True` 生成失敗的服務端根因
-- [ ] 檢查本機 Qwen 1.7B 模型快取完整性，必要時只重下載該模型
+- [x] 確認 APP 端重測仍由同一個本機 Voicebox 推論錯誤阻塞
+- [x] 檢查 Qwen 1.7B 模型快取與 API 載入狀態，確認無須重下載
 - [x] 建立模型初始化與推論的詳細診斷收集腳本與操作指引
-- [ ] 在本機 Windows Voicebox 執行詳細診斷並分析結果
+- [x] 確認 Windows PowerShell 錯誤僅因診斷腳本尚未下載至目前目錄
+- [x] 分析已收到的 Windows Voicebox 詳細診斷輸出
+- [x] 建立即時 DEBUG 日誌重現腳本與修復指引
+- [ ] 在本機 Windows Voicebox 執行 DEBUG 重現並取得完整堆疊
 - [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構
