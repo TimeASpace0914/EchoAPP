@@ -475,9 +475,10 @@ export async function generateVoiceboxSpeech(
     };
   }
 
-  // 步驟 2：輪詢生成狀態（最多等待 6 分鐘，每 2 秒查詢一次）
-  // 實測 qwen/1.7B 需要約 165 秒，預留充分時間
-  const maxPolls = 180;
+  // 步驟 2：輪詢生成狀態（最多等待 30 分鐘，每 2 秒查詢一次）。
+  // Windows CPU 首次載入模型與較長文字可能超過 6 分鐘；Voicebox 即使仍在生成，
+  // 也不能提早結束背景工作，否則完成的音檔會只留在 Voicebox history。
+  const maxPolls = 900;
   const pollInterval = 2000;
   let finalStatus: string = "generating";
   let duration: number | null = null;
@@ -520,9 +521,9 @@ export async function generateVoiceboxSpeech(
 
   if (finalStatus !== "completed") {
     return {
-      error: "語音生成逾時（超過 6 分鐘）",
+        error: "語音生成逾時（超過 30 分鐘）",
       code: "GENERATION_FAILED",
-      details: "生成狀態持續為 generating，請稍後再試或縮短文字",
+        details: "生成狀態持續為 generating，Voicebox 仍可能在本機處理中，請稍後再試或縮短文字",
     };
   }
 

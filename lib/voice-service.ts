@@ -370,7 +370,9 @@ async function restGenerateSpeech(
     throw new Error(data.error || "伺服器未返回生成工作 ID，請確認 Voicebox 伺服器正常運作。");
   }
 
-  const maxPolls = 180;
+  // 每次輪詢都是短連線；即使本機 CPU 首次模型載入較慢，也不會觸發代理層 504。
+  // 必須比後端背景工作等待時間相同，才能在 Voicebox 完成後自動取得音檔。
+  const maxPolls = 900;
   for (let attempt = 0; attempt < maxPolls; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     try {
@@ -410,12 +412,12 @@ async function restGenerateSpeech(
         throw error;
       }
       if (attempt === maxPolls - 1) {
-        throw new Error(`語音生成逾時（超過 6 分鐘）：${error instanceof Error ? error.message : "無法取得工作狀態"}`);
+        throw new Error(`語音生成逾時（超過 30 分鐘）：${error instanceof Error ? error.message : "無法取得工作狀態"}`);
       }
     }
   }
 
-  throw new Error("語音生成逾時（超過 6 分鐘），請稍後到回憶庫確認結果。");
+  throw new Error("語音生成逾時（超過 30 分鐘），請確認本機 Voicebox 是否仍在運行後再試。");
 }
 
 /**
