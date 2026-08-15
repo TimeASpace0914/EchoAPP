@@ -356,3 +356,12 @@
 ## Expo Go 實機測試連線修復
 
 - [x] 恢復 Expo 開發伺服器並驗證 iOS Bundle 可存取
+- [x] 重新啟動停止回應的開發伺服器並驗證 Expo Go 存取
+
+## Voicebox Qwen 推論錯誤修復
+
+- [x] 診斷 `Unexpected result type: list, is_tensor=True` 生成失敗的服務端根因
+- [ ] 檢查本機 Qwen 1.7B 模型快取完整性，必要時只重下載該模型
+- [x] 建立模型初始化與推論的詳細診斷收集腳本與操作指引
+- [ ] 在本機 Windows Voicebox 執行詳細診斷並分析結果
+- [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構
