@@ -390,3 +390,9 @@
 - [x] 修復回憶庫黑色添加標籤按鈕文字與深色播放箭頭可見性
 - [ ] 在本機 Windows Voicebox 執行 DEBUG 重現並取得完整堆疊
 - [ ] 在本機 Windows Voicebox 主機修復封裝 PyTorch／Transformers 環境，保留資料與 Cloudflare Tunnel 架構
+
+## 新電腦搬遷與 Cloudflare Tunnel 重建
+
+- [x] 盤點舊電腦需備份的 Voicebox、模型、Profile、Tunnel 與 APP 資料
+- [x] 提供新電腦安裝 Voicebox、Cloudflared 與沿用既有網域的操作流程
+- [x] 提供正式切換前的連線驗證與舊設備回復檢查清單
