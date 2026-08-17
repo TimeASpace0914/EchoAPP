@@ -203,6 +203,51 @@ async function recoverAcceptedGenerationId(
   }
 }
 
+/**
+ * APP 以時間戳建立唯一名稱。若 Voicebox 已建立 Profile、但 Tunnel 在回應前中斷，
+ * 可用精確名稱找回該 Profile，避免重試時建立多個空白資料。
+ */
+async function recoverCreatedProfileId(baseUrl: string, name: string): Promise<string | null> {
+  try {
+    const response = await fetchWithRetry(`${baseUrl}/profiles`, {
+      headers: NGROK_HEADERS,
+    }, 15000, 1);
+    if (!response.ok) return null;
+
+    const profiles = await response.json() as Array<{ id?: string; name?: string }>;
+    return profiles.find((profile) => profile.id && profile.name === name)?.id ?? null;
+  } catch (error) {
+    console.warn(
+      `[Voicebox] Could not recover created profile: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return null;
+  }
+}
+
+/**
+ * 樣本上傳回應遺失時，確認剛建立的 Profile 是否已保存樣本，避免同一音檔重複上傳。
+ */
+async function recoverUploadedSample(baseUrl: string, profileId: string): Promise<boolean> {
+  try {
+    const response = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
+      headers: NGROK_HEADERS,
+    }, 15000, 1);
+    if (!response.ok) return false;
+
+    const samples = await response.json() as unknown[];
+    return samples.length > 0;
+  } catch (error) {
+    console.warn(
+      `[Voicebox] Could not verify uploaded sample: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return false;
+  }
+}
+
 export type VoiceboxProfile = {
   id: string;
   name: string;
@@ -278,29 +323,48 @@ export async function uploadVoiceProfile(
     if (description) {
       profileBody.description = description;
     }
+    // 不重試 POST：Voicebox 若已建立 Profile 但 Tunnel 中斷，重試會留下重複空白資料。
     const createRes = await fetchWithRetry(`${baseUrl}/profiles`, {
       method: "POST",
       headers: { ...NGROK_HEADERS, "Content-Type": "application/json" },
       body: JSON.stringify(profileBody),
-    }, 30000, 2);
+    }, 90000, 0);
 
     if (!createRes.ok) {
       const errText = await createRes.text().catch(() => "");
+      const recoveredProfileId =
+        createRes.status === 504 || createRes.status === 522 || createRes.status === 524
+          ? await recoverCreatedProfileId(baseUrl, name)
+          : null;
+
+      if (recoveredProfileId) {
+        console.warn(
+          `[Voicebox] /profiles returned HTTP ${createRes.status}, but recovered profile ${recoveredProfileId}`,
+        );
+        profileId = recoveredProfileId;
+      } else {
+        return {
+          error: "建立聲音檔案失敗",
+          code: "UPLOAD_FAILED",
+          details: `HTTP ${createRes.status}: ${errText}`,
+        };
+      }
+    } else {
+      const profile = await createRes.json() as { id: string; name: string };
+      profileId = profile.id;
+    }
+  } catch (error) {
+    const recoveredProfileId = await recoverCreatedProfileId(baseUrl, name);
+    if (recoveredProfileId) {
+      console.warn(`[Voicebox] /profiles response lost, recovered profile ${recoveredProfileId}`);
+      profileId = recoveredProfileId;
+    } else {
       return {
-        error: "建立聲音檔案失敗",
-        code: "UPLOAD_FAILED",
-        details: `HTTP ${createRes.status}: ${errText}`,
+        error: "無法連線至 Voicebox 服務（建立聲音檔案時）",
+        code: "CONNECTION_FAILED",
+        details: error instanceof Error ? error.message : "未知錯誤",
       };
     }
-
-    const profile = await createRes.json() as { id: string; name: string };
-    profileId = profile.id;
-  } catch (error) {
-    return {
-      error: "無法連線至 Voicebox 服務（建立聲音檔案時）",
-      code: "CONNECTION_FAILED",
-      details: error instanceof Error ? error.message : "未知錯誤",
-    };
   }
 
   // 步驟 2：上傳參考音檔（先轉換為 WAV，再構建 multipart/form-data）
@@ -381,6 +445,7 @@ export async function uploadVoiceProfile(
     );
     const multipartBody = Buffer.concat([fileHeader, binaryData, fileFooter, textPart, endBoundary]);
     console.log(`[Voicebox] Uploading sample with reference_text: "${actualReferenceText.substring(0, 50)}"`);
+    // 不重試 POST：若遠端已保存樣本但回應遺失，改以樣本列表確認，避免重複上傳。
     const sampleRes = await fetchWithRetry(`${baseUrl}/profiles/${profileId}/samples`, {
       method: "POST",
       headers: {
@@ -388,10 +453,21 @@ export async function uploadVoiceProfile(
         "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body: multipartBody,
-    }, 60000, 2);
+    }, 120000, 0);
 
     if (!sampleRes.ok) {
       const errText = await sampleRes.text().catch(() => "");
+      const recoveredSample =
+        sampleRes.status === 504 || sampleRes.status === 522 || sampleRes.status === 524
+          ? await recoverUploadedSample(baseUrl, profileId)
+          : false;
+
+      if (recoveredSample) {
+        console.warn(
+          `[Voicebox] sample upload returned HTTP ${sampleRes.status}, but a sample exists on ${profileId}`,
+        );
+        return { profile_id: profileId, name };
+      }
       console.error(`[Voicebox] Sample upload failed: HTTP ${sampleRes.status}: ${errText.substring(0, 200)}`);
       return {
         error: "上傳參考音檔失敗",
@@ -403,6 +479,11 @@ export async function uploadVoiceProfile(
     console.log(`[Voicebox] Sample uploaded successfully for profile ${profileId}`);
     return { profile_id: profileId, name };
   } catch (error) {
+    const recoveredSample = await recoverUploadedSample(baseUrl, profileId);
+    if (recoveredSample) {
+      console.warn(`[Voicebox] sample upload response lost, recovered saved sample on ${profileId}`);
+      return { profile_id: profileId, name };
+    }
     console.error(`[Voicebox] Sample upload error:`, error instanceof Error ? error.message : error);
     return {
       error: "上傳參考音檔時發生錯誤",

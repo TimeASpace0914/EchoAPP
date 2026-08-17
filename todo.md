@@ -396,3 +396,8 @@
 - [x] 盤點舊電腦需備份的 Voicebox、模型、Profile、Tunnel 與 APP 資料
 - [x] 提供新電腦安裝 Voicebox、Cloudflared 與沿用既有網域的操作流程
 - [x] 提供正式切換前的連線驗證與舊設備回復檢查清單
+- [ ] 修復新電腦 Cloudflare Windows Service 的 503 ingress 導向設定
+- [ ] 修正 Cloudflared Windows Service 的 ImagePath 並驗證不靠手動 Tunnel 仍可公開連線
+- [ ] 診斷新電腦首次 Voicebox 生成超過 22 分鐘的模型下載、載入或 CPU 推論狀態
+- [x] 加入 Profile 建立與樣本上傳的 Tunnel 逾時復原，避免 APP 誤報無法連線
+- [ ] 以新電腦 APP 實測建立 Profile、上傳樣本與生成的完整流程
