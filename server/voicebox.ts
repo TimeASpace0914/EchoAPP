@@ -57,6 +57,80 @@ async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buff
   }
 }
 
+type ReferenceAudioQuality = {
+  durationSeconds: number | null;
+  effectiveSpeechSeconds: number | null;
+  meanVolumeDb: number | null;
+  maxVolumeDb: number | null;
+};
+
+/**
+ * 只做讀取式分析：保留原始音檔，並將結果用於新 Profile 的品質閘門。
+ * 不在此階段做激烈降噪或覆寫，避免破壞說話者音色特徵。
+ */
+async function analyzeReferenceAudio(inputBuffer: Buffer, inputExt: string): Promise<ReferenceAudioQuality> {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `vb_quality_${Date.now()}_${Math.random().toString(36).slice(2)}.${inputExt}`);
+  const empty: ReferenceAudioQuality = {
+    durationSeconds: null,
+    effectiveSpeechSeconds: null,
+    meanVolumeDb: null,
+    maxVolumeDb: null,
+  };
+
+  try {
+    fs.writeFileSync(inputPath, inputBuffer);
+    const probe = await execFileAsync("ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      inputPath,
+    ], { timeout: 10000 });
+    const durationSeconds = Number.parseFloat(probe.stdout.trim());
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return empty;
+
+    const volume = await execFileAsync("ffmpeg", [
+      "-hide_banner",
+      "-i", inputPath,
+      "-af", "volumedetect",
+      "-f", "null",
+      "-",
+    ], { timeout: 15000 });
+    const volumeOutput = `${volume.stdout}\n${volume.stderr}`;
+    const meanVolumeDb = Number.parseFloat(volumeOutput.match(/mean_volume:\s*(-?[\d.]+)\s*dB/)?.[1] ?? "NaN");
+    const maxVolumeDb = Number.parseFloat(volumeOutput.match(/max_volume:\s*(-?[\d.]+)\s*dB/)?.[1] ?? "NaN");
+
+    let effectiveSpeechSeconds: number | null = null;
+    try {
+      const silence = await execFileAsync("ffmpeg", [
+        "-hide_banner",
+        "-i", inputPath,
+        "-af", "silencedetect=n=-38dB:d=0.7",
+        "-f", "null",
+        "-",
+      ], { timeout: 15000 });
+      const silenceOutput = `${silence.stdout}\n${silence.stderr}`;
+      const silentSeconds = Array.from(silenceOutput.matchAll(/silence_duration:\s*([\d.]+)/g))
+        .reduce((total, match) => total + Number.parseFloat(match[1]), 0);
+      effectiveSpeechSeconds = Math.max(0, durationSeconds - Math.min(durationSeconds, silentSeconds));
+    } catch {
+      // 靜音分析不可用時仍保留時長與音量檢查，不讓分析工具本身阻斷有效上傳。
+    }
+
+    return {
+      durationSeconds,
+      effectiveSpeechSeconds,
+      meanVolumeDb: Number.isFinite(meanVolumeDb) ? meanVolumeDb : null,
+      maxVolumeDb: Number.isFinite(maxVolumeDb) ? maxVolumeDb : null,
+    };
+  } catch (error) {
+    console.warn(`[Voicebox] Reference quality analysis unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    return empty;
+  } finally {
+    try { fs.unlinkSync(inputPath); } catch {}
+  }
+}
+
 function getVoiceboxUrl(): string {
   const url = (ENV as any).voiceboxUrl || process.env.VOICEBOX_URL || "http://localhost:17493";
   return url.replace(/\/+$/, "");
@@ -259,9 +333,42 @@ export type VoiceboxProfile = {
 
 export type VoiceboxError = {
   error: string;
-  code: "CONNECTION_FAILED" | "PROFILE_NOT_FOUND" | "GENERATION_FAILED" | "UPLOAD_FAILED" | "NOT_CONFIGURED";
+  code: "CONNECTION_FAILED" | "PROFILE_NOT_FOUND" | "GENERATION_FAILED" | "UPLOAD_FAILED" | "NOT_CONFIGURED" | "QUALITY_REJECTED";
   details?: string;
 };
+
+/** 將可量測的品質問題轉為家屬可理解的更換素材建議。 */
+export function getReferenceQualityRejection(quality: ReferenceAudioQuality): VoiceboxError | null {
+  if (quality.durationSeconds !== null && quality.durationSeconds < 20) {
+    return {
+      error: "參考音檔過短，暫不建立聲音身份",
+      code: "QUALITY_REJECTED",
+      details: `目前只有 ${quality.durationSeconds.toFixed(1)} 秒；請提供至少 20 秒、建議 45–90 秒的單人自然說話片段。`,
+    };
+  }
+  if (quality.effectiveSpeechSeconds !== null && quality.effectiveSpeechSeconds < 15) {
+    return {
+      error: "參考音檔的有效語音不足",
+      code: "QUALITY_REJECTED",
+      details: `偵測到約 ${quality.effectiveSpeechSeconds.toFixed(1)} 秒有效人聲；請裁掉長靜音、音樂或其他人說話後再上傳。`,
+    };
+  }
+  if (quality.meanVolumeDb !== null && quality.meanVolumeDb < -42) {
+    return {
+      error: "參考音檔音量過低",
+      code: "QUALITY_REJECTED",
+      details: `平均音量約 ${quality.meanVolumeDb.toFixed(1)} dB；請改用說話者更靠近麥克風、內容更清楚的片段。`,
+    };
+  }
+  if (quality.maxVolumeDb !== null && quality.maxVolumeDb >= -0.1) {
+    return {
+      error: "參考音檔可能有爆音或 clipping",
+      code: "QUALITY_REJECTED",
+      details: `峰值約 ${quality.maxVolumeDb.toFixed(1)} dB；請改用沒有破音、突然大聲或麥克風失真的片段。`,
+    };
+  }
+  return null;
+}
 
 function isVoiceboxError(r: unknown): r is VoiceboxError {
   return typeof r === "object" && r !== null && "error" in r && "code" in r;
@@ -312,6 +419,14 @@ export async function uploadVoiceProfile(
   description?: string,
 ): Promise<{ profile_id: string; name: string } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
+  const inputExt = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : mimeType.includes("flac") ? "flac" : mimeType.includes("ogg") ? "ogg" : mimeType.includes("aac") ? "aac" : "m4a";
+  const quality = await analyzeReferenceAudio(Buffer.from(audioBase64, "base64"), inputExt);
+  const qualityRejection = getReferenceQualityRejection(quality);
+  if (qualityRejection) {
+    console.warn(`[Voicebox] Reference rejected before Profile creation: ${qualityRejection.error} (${qualityRejection.details})`);
+    return qualityRejection;
+  }
+  console.log(`[Voicebox] Reference quality accepted: duration=${quality.durationSeconds?.toFixed(1) ?? "unknown"}s, effective=${quality.effectiveSpeechSeconds?.toFixed(1) ?? "unknown"}s, mean=${quality.meanVolumeDb?.toFixed(1) ?? "unknown"}dB, peak=${quality.maxVolumeDb?.toFixed(1) ?? "unknown"}dB`);
 
   // 步驟 1：建立 Profile（JSON），若有個性設定或聲音描述則一同送出
   let profileId: string;

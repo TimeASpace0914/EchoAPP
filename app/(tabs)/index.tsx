@@ -34,12 +34,20 @@ import {
   saveHistoryEntry,
   validateAudioFile,
   checkVoiceboxStatus,
+  getVoiceboxProfiles,
   ALL_SUPPORTED_EXTENSIONS,
   SUPPORTED_AUDIO_EXTENSIONS,
   type HistoryEntry,
 } from "@/lib/voice-service";
 import { generationStore, type GenerationState } from "@/lib/generation-store";
 import { stripPronunciationMarkers } from "@/lib/pinyin-helpers";
+import {
+  approveVoiceProfile,
+  getManagedVoiceProfiles,
+  registerCandidateVoiceProfile,
+  recordVoiceProfilePreview,
+  type ManagedVoiceProfile,
+} from "@/lib/voice-profile-store";
 import Slider from "@react-native-community/slider";
 
 const MAX_TEXT_LENGTH = 500;
@@ -56,6 +64,12 @@ const EMOTION_OPTIONS = [
   { label: "鼓勵", value: "鼓勵振奮，語氣堅定有力量，讓人感到被支持" },
   { label: "激昂", value: "激昂熱血，音量與起伏明顯，節奏有推進感" },
   { label: "生氣", value: "生氣憤怒，語氣壓低且有力度，咬字短促明確" },
+] as const;
+
+const PROFILE_PREVIEW_SCRIPTS = [
+  { key: "daily", label: "第 1 段・日常", text: "今天過得好嗎？記得好好吃飯，也要早一點休息。" },
+  { key: "care", label: "第 2 段・關懷", text: "看到你平安、把自己照顧好，我就很放心。" },
+  { key: "name", label: "第 3 段・專名", text: "請把常用稱呼、人名或需要特別確認讀音的詞填在這裡。" },
 ] as const;
 
 export default function HomeScreen() {
@@ -80,6 +94,12 @@ export default function HomeScreen() {
   const [speed, setSpeed] = useState(1.0);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [genStoreState, setGenStoreState] = useState<GenerationState>(generationStore.getState());
+  const [voiceProfiles, setVoiceProfiles] = useState<ManagedVoiceProfile[]>([]);
+  const [selectedVoiceProfileId, setSelectedVoiceProfileId] = useState<string | null>(null);
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
+  const [isSingleSpeakerConfirmed, setIsSingleSpeakerConfirmed] = useState(false);
+  const [activePreviewKey, setActivePreviewKey] = useState<string | null>(null);
 
   // 首頁淡入過場動畫
   const contentOpacity = useSharedValue(0);
@@ -119,6 +139,26 @@ export default function HomeScreen() {
     });
     return () => { cancelled = true; clearTimeout(timeout); };
   }, []);
+
+  const loadVoiceProfiles = useCallback(async () => {
+    setIsLoadingProfiles(true);
+    setProfileLoadError(null);
+    try {
+      const remoteProfiles = await getVoiceboxProfiles();
+      const managedProfiles = await getManagedVoiceProfiles(remoteProfiles);
+      setVoiceProfiles(managedProfiles);
+    } catch (error) {
+      setProfileLoadError(error instanceof Error ? error.message : "無法載入聲音身份");
+    } finally {
+      setIsLoadingProfiles(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (voiceboxOnline) {
+      void loadVoiceProfiles();
+    }
+  }, [voiceboxOnline, loadVoiceProfiles]);
 
   const previewPlayer = useAudioPlayer(audioUri ? { uri: audioUri } : null);
 
@@ -162,6 +202,9 @@ export default function HomeScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        // 新音檔會建立候選版本；不會覆蓋使用者目前選擇的已核可 Profile。
+        setSelectedVoiceProfileId(null);
+        setIsSingleSpeakerConfirmed(false);
         setValidationWarning(null);
         setIsValidating(true);
         setIsPreviewPlaying(false);
@@ -174,18 +217,7 @@ export default function HomeScreen() {
           Alert.alert(
             "音檔提醒",
             validation.error || "此音檔不符合要求，請重新選擇。",
-            [
-              { text: "重新選擇", onPress: () => pickAudio() },
-              {
-                text: "仍要使用",
-                  onPress: () => {
-                    setAudioUri(asset.uri);
-                    setAudioName(asset.name || "未命名音檔");
-                    setAudioMimeType(asset.mimeType || null);
-                    setValidationWarning(validation.error || null);
-                  },
-              },
-            ]
+            [{ text: "重新選擇", onPress: () => pickAudio() }],
           );
           return;
         }
@@ -203,9 +235,36 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const selectedVoiceProfile = voiceProfiles.find((profile) => profile.id === selectedVoiceProfileId) ?? null;
+
+  const handleApproveProfile = useCallback(async (profile: ManagedVoiceProfile) => {
+    if (profile.previewCount < PROFILE_PREVIEW_SCRIPTS.length) {
+      Alert.alert("尚未完成預覽", `請先完成 ${PROFILE_PREVIEW_SCRIPTS.length} 段固定預覽，確認文字、音色與情緒後再核可。`);
+      return;
+    }
+    try {
+      await approveVoiceProfile(profile.id, profile.name);
+      await loadVoiceProfiles();
+      setSelectedVoiceProfileId(profile.id);
+      setAudioUri(null);
+      setAudioName("");
+      setAudioMimeType(null);
+      setValidationWarning(null);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      Alert.alert("無法核可聲音身份", "請確認裝置儲存空間後再試一次。");
+    }
+  }, [loadVoiceProfiles]);
+
   const handleGenerate = useCallback(async () => {
-    if (!audioUri) {
-      Alert.alert("提醒", "請先上傳親友生前的音檔");
+    if (!audioUri && !selectedVoiceProfile) {
+      Alert.alert("提醒", "請先上傳親友生前的音檔，或選擇已核可的聲音身份");
+      return;
+    }
+    if (audioUri && !selectedVoiceProfile && !isSingleSpeakerConfirmed) {
+      Alert.alert("請先確認音檔內容", "建立新的聲音身份前，請確認這段音檔主要只有一位親友說話；若有多人對話，請先裁切出目標親友的單人片段。");
       return;
     }
     if (!text.trim()) {
@@ -227,7 +286,8 @@ export default function HomeScreen() {
       // 一次只傳入一個主情緒，讓模型有明確的表達方向。
       const primaryEmotion = selectedEmotion || undefined;
       const result = await generateSpeech({
-        referenceAudioUri: audioUri,
+        referenceAudioUri: audioUri || undefined,
+        voiceProfileId: selectedVoiceProfile?.id,
         text: text.trim(),
         audioMimeType: audioMimeType || undefined,
         audioFileName: audioName || undefined,
@@ -244,16 +304,40 @@ export default function HomeScreen() {
         },
       });
 
+      // 新音檔只會留下候選 Profile；已核可 Profile 不會被新樣本覆蓋。
+      if (!selectedVoiceProfile && result.profileId) {
+        await registerCandidateVoiceProfile({
+          profileId: result.profileId,
+          name: voiceDescription.trim() || `候選聲音 ${audioName || "未命名"}`,
+          sourceAudioName: audioName || undefined,
+          referenceText: referenceText.trim() || undefined,
+        });
+        void loadVoiceProfiles();
+      }
+
+      const activePreview = PROFILE_PREVIEW_SCRIPTS.find((preview) => preview.key === activePreviewKey);
+      if (
+        selectedVoiceProfile?.status === "candidate" &&
+        activePreview &&
+        text.trim() === activePreview.text
+      ) {
+        await recordVoiceProfilePreview(result.profileId, selectedVoiceProfile.name, activePreview.key);
+        setActivePreviewKey(null);
+        void loadVoiceProfiles();
+      }
+
       const entry: HistoryEntry = {
         id: `echo_${result.createdAt}`,
         text: spokenText,
         audioUri: result.audioUri,
-        referenceAudioName: audioName,
+        referenceAudioName: selectedVoiceProfile?.name || audioName,
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
         emotion: primaryEmotion,
         speed: speed !== 1.0 ? speed : undefined,
+        profileId: result.profileId,
+        voiceProfileName: selectedVoiceProfile?.name || voiceDescription.trim() || audioName,
       };
       await saveHistoryEntry(entry);
 
@@ -294,7 +378,7 @@ export default function HomeScreen() {
       setIsGenerating(false);
       // 保留進度條和錯誤訊息讓用戶看到，不立即清除
     }
-  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, referenceText, speed, selectedEmotion, isGenerating]);
+  }, [audioUri, text, audioName, audioMimeType, personality, voiceDescription, referenceText, speed, selectedEmotion, selectedVoiceProfile, isSingleSpeakerConfirmed, isGenerating, loadVoiceProfiles, activePreviewKey]);
 
   // 生成計時器
   useEffect(() => {
@@ -343,6 +427,98 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* 聲音身份：正式生成應優先重用已核可的最佳 Profile。 */}
+        <View style={[styles.voiceIdentityCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+          <View style={styles.voiceIdentityHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.voiceIdentityTitle, { color: colors.foreground }]}>聲音身份</Text>
+              <Text style={[styles.voiceIdentityHint, { color: colors.muted }]}>選用已核可聲音可維持音色穩定；新音檔只會建立候選版本</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => void loadVoiceProfiles()}
+              disabled={isLoadingProfiles}
+              style={[styles.profileRefreshButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.profileRefreshText, { color: colors.foreground }]}>{isLoadingProfiles ? "載入中" : "更新"}</Text>
+            </TouchableOpacity>
+          </View>
+          {profileLoadError ? (
+            <Text style={[styles.profileErrorText, { color: colors.warning }]}>{profileLoadError}</Text>
+          ) : voiceProfiles.length === 0 && !isLoadingProfiles ? (
+            <Text style={[styles.voiceIdentityHint, { color: colors.muted }]}>尚未載入既有聲音身份；您可先上傳授權音檔建立候選版本。</Text>
+          ) : (
+            <View style={styles.voiceProfileList}>
+              {voiceProfiles.map((profile) => {
+                const selected = profile.id === selectedVoiceProfileId;
+                const approved = profile.status === "approved";
+                const statusText = approved ? "已核可" : profile.status === "candidate" ? "候選" : "未核可";
+                return (
+                  <View key={profile.id} style={[styles.voiceProfileItem, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? `${colors.primary}10` : colors.background }]}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const nextProfileId = selected ? null : profile.id;
+                        setSelectedVoiceProfileId(nextProfileId);
+                        if (nextProfileId) {
+                          setAudioUri(null);
+                          setAudioName("");
+                          setAudioMimeType(null);
+                          setValidationWarning(null);
+                        }
+                      }}
+                      style={styles.voiceProfileSelectArea}
+                    >
+                      <Text style={[styles.voiceProfileName, { color: colors.foreground }]} numberOfLines={1}>{profile.name}</Text>
+                      <Text style={[styles.voiceProfileMeta, { color: approved ? colors.success : colors.muted }]}>{statusText} · {profile.sampleCount ?? 0} 份樣本</Text>
+                    </TouchableOpacity>
+                    {approved ? (
+                      <Text style={[styles.profileApprovedText, { color: colors.success }]}>{selected ? "使用中" : "選用"}</Text>
+                    ) : (
+                      <TouchableOpacity onPress={() => void handleApproveProfile(profile)} style={[styles.profileApproveButton, { borderColor: colors.primary }]}>
+                        <Text style={[styles.profileApproveText, { color: colors.primary }]}>核可</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          {selectedVoiceProfile && (
+            <Text style={[styles.selectedProfileHint, { color: colors.success }]}>目前會重用「{selectedVoiceProfile.name}」，不會重新上傳或改寫它。</Text>
+          )}
+          {selectedVoiceProfile?.status === "candidate" && (
+            <View style={[styles.previewGateBox, { borderColor: colors.border, backgroundColor: colors.background }]}>
+              <Text style={[styles.previewGateTitle, { color: colors.foreground }]}>三段預覽驗收 · {selectedVoiceProfile.previewCount}/{PROFILE_PREVIEW_SCRIPTS.length}</Text>
+              <Text style={[styles.previewGateHint, { color: colors.muted }]}>依序生成三段固定文字；第 3 段請改填家屬姓名或專用詞，並確認讀音。</Text>
+              <View style={styles.previewButtons}>
+                {PROFILE_PREVIEW_SCRIPTS.map((preview) => {
+                  const completed = selectedVoiceProfile.completedPreviewKeys?.includes(preview.key) ?? false;
+                  return (
+                    <TouchableOpacity
+                      key={preview.key}
+                      onPress={() => {
+                        setText(preview.key === "name" ? "" : preview.text);
+                        setActivePreviewKey(preview.key);
+                      }}
+                      style={[styles.previewButton, { borderColor: activePreviewKey === preview.key ? colors.primary : colors.border, backgroundColor: activePreviewKey === preview.key ? `${colors.primary}10` : colors.surface }]}
+                    >
+                      <Text style={[styles.previewButtonText, { color: colors.foreground }]}>{preview.label}{completed ? " ✓" : ""}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedVoiceProfileId(null);
+              void pickAudio();
+            }}
+            style={[styles.useNewSampleButton, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.useNewSampleText, { color: colors.foreground }]}>使用新音檔建立候選聲音</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 上傳卡片 */}
         <View
           style={[
@@ -362,9 +538,22 @@ export default function HomeScreen() {
               <Text style={[styles.audioFileName, { color: colors.foreground }]} numberOfLines={1}>
                 {audioName}
               </Text>
-              <Text style={[styles.audioFileHint, { color: colors.muted }]}>
+              <Text style={[styles.audioFileHint, { color: colors.muted }]}> 
                 音檔已就緒
               </Text>
+
+              <TouchableOpacity
+                onPress={() => setIsSingleSpeakerConfirmed((current) => !current)}
+                style={[styles.singleSpeakerCheck, { borderColor: isSingleSpeakerConfirmed ? colors.primary : colors.border, backgroundColor: isSingleSpeakerConfirmed ? `${colors.primary}10` : colors.background }]}
+              >
+                <View style={[styles.singleSpeakerCheckMark, { borderColor: isSingleSpeakerConfirmed ? colors.primary : colors.muted, backgroundColor: isSingleSpeakerConfirmed ? colors.primary : "transparent" }]}>
+                  {isSingleSpeakerConfirmed && <Text style={styles.singleSpeakerCheckSymbol}>✓</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.singleSpeakerCheckTitle, { color: colors.foreground }]}>此片段主要只有一位親友說話</Text>
+                  <Text style={[styles.singleSpeakerCheckHint, { color: colors.muted }]}>有多人、電視聲或音樂時，請先裁切出單人且清楚的片段</Text>
+                </View>
+              </TouchableOpacity>
 
               {validationWarning && (
                 <View style={[styles.warningBox, { backgroundColor: `${colors.warning}15` }]}>
@@ -465,8 +654,8 @@ export default function HomeScreen() {
                     {formatHint}
                   </Text>
                 </View>
-                <Text style={[styles.formatHintSub, { color: colors.muted }]}>
-                  建議音檔長度至少 3 秒以上
+                <Text style={[styles.formatHintSub, { color: colors.muted }]}> 
+                  至少 20 秒；建議 45–90 秒的單人自然說話
                 </Text>
               </View>
 
@@ -832,6 +1021,125 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  voiceIdentityCard: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  voiceIdentityHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  voiceIdentityTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  voiceIdentityHint: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  profileRefreshButton: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  profileRefreshText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  profileErrorText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  voiceProfileList: {
+    gap: 8,
+  },
+  voiceProfileItem: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingLeft: 12,
+    paddingRight: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  voiceProfileSelectArea: {
+    flex: 1,
+    gap: 3,
+  },
+  voiceProfileName: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  voiceProfileMeta: {
+    fontSize: 11,
+  },
+  profileApprovedText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  profileApproveButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  profileApproveText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  selectedProfileHint: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  useNewSampleButton: {
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  useNewSampleText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  previewGateBox: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 8,
+  },
+  previewGateTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  previewGateHint: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  previewButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  previewButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  previewButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
   uploadPlaceholder: {
     alignItems: "center",
     gap: 12,
@@ -907,6 +1215,40 @@ const styles = StyleSheet.create({
   },
   audioFileHint: {
     fontSize: 13,
+  },
+  singleSpeakerCheck: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  singleSpeakerCheckMark: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  singleSpeakerCheckSymbol: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  singleSpeakerCheckTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  singleSpeakerCheckHint: {
+    fontSize: 11,
+    lineHeight: 16,
   },
   warningBox: {
     flexDirection: "row",

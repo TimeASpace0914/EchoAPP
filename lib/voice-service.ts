@@ -28,7 +28,7 @@ function createTimeoutSignal(ms: number): AbortSignal {
 
 export interface VoiceGenerationParams {
   /** 參考音檔 URI（親友生前音檔） */
-  referenceAudioUri: string;
+  referenceAudioUri?: string;
   /** 要生成的文字內容 */
   text: string;
   /** Voicebox 聲音檔案 ID（若已建立） */
@@ -66,6 +66,15 @@ export interface VoiceGenerationResult {
   createdAt: number;
   /** 是否使用 Voicebox 真實生成 */
   isRealVoice: boolean;
+  /** 本次實際使用的 Voicebox Profile，可供之後穩定重用 */
+  profileId: string;
+}
+
+export interface VoiceboxProfileSummary {
+  id: string;
+  name: string;
+  description?: string | null;
+  sampleCount?: number;
 }
 
 export interface HistoryEntry {
@@ -85,6 +94,10 @@ export interface HistoryEntry {
   emotion?: string;
   /** 生成時使用的語速設定 */
   speed?: number;
+  /** 本次生成使用的 Voicebox Profile，供後續追溯與穩定重用 */
+  profileId?: string;
+  /** Profile 的可讀名稱 */
+  voiceProfileName?: string;
 }
 
 /** 支援的音檔格式 */
@@ -99,8 +112,8 @@ export const ALL_SUPPORTED_EXTENSIONS = [
   ...SUPPORTED_AUDIO_EXTENSIONS,
 ];
 
-/** 最低音檔時長（秒） */
-export const MIN_AUDIO_DURATION = 3;
+/** 建立新聲音身份所需的最低音檔時長（秒） */
+export const MIN_AUDIO_DURATION = 20;
 
 /** 音檔驗證結果 */
 export interface AudioValidationResult {
@@ -177,7 +190,7 @@ export async function validateAudioFile(
       return {
         valid: false,
         duration,
-        error: `音檔長度僅 ${duration.toFixed(1)} 秒，建議至少 ${MIN_AUDIO_DURATION} 秒以上，才能獲得更好的語音克隆效果。`,
+        error: `音檔長度僅 ${duration.toFixed(1)} 秒。建立聲音身份至少需要 ${MIN_AUDIO_DURATION} 秒，建議提供 45–90 秒的單人自然說話片段。`,
       };
     }
     return { valid: true, duration };
@@ -458,6 +471,26 @@ export async function checkVoiceboxStatus(): Promise<{
   }
 }
 
+/** 取得目前 Voicebox 中可使用的 Profile，供使用者選擇已核可聲音。 */
+export async function getVoiceboxProfiles(): Promise<VoiceboxProfileSummary[]> {
+  const apiBase = getApiBaseUrl();
+  try {
+    const response = await fetch(`${apiBase}/api/voicebox/profiles`, {
+      signal: createTimeoutSignal(15000),
+    });
+    const payload = await response.json().catch(() => ({})) as {
+      success?: boolean;
+      profiles?: VoiceboxProfileSummary[];
+    };
+    if (!response.ok || !payload.success || !Array.isArray(payload.profiles)) {
+      throw new Error("無法取得 Voicebox Profile 列表");
+    }
+    return payload.profiles;
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "無法取得 Voicebox Profile 列表");
+  }
+}
+
 /**
  * 生成語音
  *
@@ -491,6 +524,9 @@ export async function generateSpeech(
 
   // 若沒有 profile ID，先上傳音檔建立 profile
   if (!voiceProfileId) {
+    if (!params.referenceAudioUri) {
+      throw new Error("請先選擇參考音檔，或改用已核可的聲音身份。");
+    }
     if (onProgress) onProgress(10, "正在轉錄參考音檔內容...");
     try {
       // 使用 picker 提供的真實 mimeType，否則從副檔名推導
@@ -593,6 +629,7 @@ export async function generateSpeech(
     duration: estimatedDuration,
     createdAt: timestamp,
     isRealVoice: true,
+    profileId: voiceProfileId,
   };
 }
 

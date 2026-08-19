@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { checkVoiceboxHealth, uploadVoiceProfile, generateVoiceboxSpeech } from "../voicebox";
+import { checkVoiceboxHealth, getVoiceboxProfiles, uploadVoiceProfile, generateVoiceboxSpeech } from "../voicebox";
 import { storagePut } from "../storage";
 
 type VoiceboxGenerationJob = {
@@ -111,6 +111,32 @@ async function startServer() {
     }
   });
 
+  // 只回傳建立／重用聲音身份所需的摘要；APP 的候選／核可狀態由裝置端管理，
+  // 不會改動 Voicebox 原始 Profile，也不會覆蓋既有最佳聲音。
+  app.get("/api/voicebox/profiles", async (_req, res) => {
+    try {
+      const profiles = await getVoiceboxProfiles();
+      if ("error" in profiles) {
+        res.status(502).json({ success: false, error: profiles.error, details: profiles.details });
+        return;
+      }
+      res.json({
+        success: true,
+        profiles: profiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+          description: profile.description ?? null,
+          sampleCount: profile.sample_count ?? 0,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "無法取得 Voicebox Profile 列表",
+      });
+    }
+  });
+
   app.post("/api/voicebox/upload", async (req, res) => {
     try {
       const { name, audioBase64, mimeType, referenceText, personality, description } = req.body as {
@@ -130,7 +156,7 @@ async function startServer() {
       // profile name 保持原始 name（自動產生的 echo_timestamp）
       const result = await uploadVoiceProfile(name, audioBase64, mimeType || "audio/wav", referenceText, personality, description);
       if ("error" in result) {
-        res.status(502).json({ success: false, error: result.error, details: result.details });
+        res.status(result.code === "QUALITY_REJECTED" ? 422 : 502).json({ success: false, error: result.error, details: result.details });
         return;
       }
       res.json({ success: true, profileId: result.profile_id, name: result.name });
