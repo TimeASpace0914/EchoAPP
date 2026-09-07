@@ -25,6 +25,10 @@ const FORCED_PRONUNCIATION_LEXICON: ReadonlyArray<{
   { term: "日日誦經", pinyin: "rì rì sòng jīng", zhuyin: "ㄖˋ ㄖˋ ㄙㄨㄥˋ ㄐㄧㄥ" },
   { term: "祝禱加持", pinyin: "zhù dǎo jiā chí", zhuyin: "ㄓㄨˋ ㄉㄠˇ ㄐㄧㄚ ㄔˊ" },
   { term: "蔡承諺", pinyin: "cài chéng yàn", zhuyin: "ㄘㄞˋ ㄔㄥˊ ㄧㄢˋ" },
+  { term: "畢業專題", pinyin: "bì yè zhuān tí", zhuyin: "ㄅㄧˋ ㄧㄝˋ ㄓㄨㄢ ㄊㄧˊ" },
+  { term: "軟體", pinyin: "ruǎn tǐ", zhuyin: "ㄖㄨㄢˇ ㄊㄧˇ" },
+  { term: "緬懷", pinyin: "miǎn huái", zhuyin: "ㄇㄧㄢˇ ㄏㄨㄞˊ" },
+  { term: "療癒", pinyin: "liáo yù", zhuyin: "ㄌㄧㄠˊ ㄩˋ" },
 ];
 
 /** 已知注音到拼音的精準對照，只供使用者標注的三個易錯字使用。 */
@@ -43,6 +47,10 @@ const PHONETIC_SURROGATE_LEXICON: ReadonlyArray<{ source: string; surrogate: str
   { source: "日日誦經", surrogate: "日日送經" },
   { source: "祝禱加持", surrogate: "祝島加持" },
   { source: "蔡承諺", surrogate: "菜成燕" },
+  { source: "畢業專題", surrogate: "畢業專提" },
+  { source: "軟體", surrogate: "阮體" },
+  { source: "緬懷", surrogate: "勉懷" },
+  { source: "療癒", surrogate: "遼遇" },
 ];
 
 /**
