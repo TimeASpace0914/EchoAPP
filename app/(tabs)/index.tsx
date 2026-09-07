@@ -16,7 +16,6 @@ import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import Slider from "@react-native-community/slider";
 import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Logo } from "@/components/logo";
@@ -51,6 +50,8 @@ const EMOTION_OPTIONS = [
   { label: "慈祥", value: "慈祥溫暖，如長輩親切叮嚀，聲線厚實安定" },
   { label: "思念", value: "思念感傷，情緒含蓄低迴，句尾帶有不捨但不哭腔" },
   { label: "鼓勵", value: "鼓勵振奮，語氣堅定有力量，讓人感到被支持" },
+  { label: "激昂", value: "激昂熱血，音量與起伏明顯，節奏有推進感" },
+  { label: "生氣", value: "生氣憤怒，語氣壓低且有力度，咬字短促明確" },
 ] as const;
 
 type PickedReferenceMedia = {
@@ -174,6 +175,9 @@ export default function HomeScreen() {
       setReferenceAudioName(displayName);
       setReferenceAudioMimeType(asset.mimeType || null);
       setReferenceMediaType(validation.mediaType || (asset.mimeType?.startsWith("video/") ? "video" : "audio"));
+      if (validation.warning) {
+        Alert.alert("素材品質提醒", validation.warning);
+      }
       if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
       Alert.alert("無法讀取媒體", "請確認檔案或影片內容完整後再試一次。 ");
@@ -192,26 +196,6 @@ export default function HomeScreen() {
       await acceptReferenceMedia(result.assets[0]);
     } catch {
       Alert.alert("無法選擇媒體", "請確認音檔或影片格式後再試一次。 ");
-    }
-  }, [acceptReferenceMedia]);
-
-  const pickVideoFromLibrary = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["videos"],
-        quality: 1,
-        videoExportPreset: ImagePicker.VideoExportPreset.H264_640x480,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      await acceptReferenceMedia({
-        uri: asset.uri,
-        name: asset.fileName || `手機影片_${Date.now()}.mov`,
-        mimeType: asset.mimeType,
-        size: asset.fileSize,
-      });
-    } catch {
-      Alert.alert("無法開啟相簿", "請確認相簿存取權限後再試一次。 ");
     }
   }, [acceptReferenceMedia]);
 
@@ -366,18 +350,12 @@ export default function HomeScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.mediaPickerActions}>
-                  <TouchableOpacity onPress={() => void pickReferenceMediaFromFiles()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.uploadButton, { flex: 1, borderColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
-                    {isValidatingAudio ? <ActivityIndicator color={colors.primary} /> : <IconSymbol name="cloud.fill" size={20} color={colors.primary} />}
-                    <Text style={[styles.uploadButtonText, { color: colors.primary }]}>{isValidatingAudio ? "正在檢查..." : "選擇音檔或檔案"}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => void pickVideoFromLibrary()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.videoLibraryButton, { backgroundColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
-                    <IconSymbol name="play.fill" size={18} color={colors.background} />
-                    <Text style={[styles.videoLibraryButtonText, { color: colors.background }]}>手機影片</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={() => void pickReferenceMediaFromFiles()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.uploadButton, { borderColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
+                  {isValidatingAudio ? <ActivityIndicator color={colors.primary} /> : <IconSymbol name="cloud.fill" size={20} color={colors.primary} />}
+                  <Text style={[styles.uploadButtonText, { color: colors.primary }]}>{isValidatingAudio ? "正在檢查檔案..." : "選擇授權檔案"}</Text>
+                </TouchableOpacity>
               )}
-              <Text style={[styles.uploadTip, { color: colors.muted }]}>支援 MP3、WAV、M4A、MP4、MOV 等格式。至少 20 秒；建議 45–90 秒的單人自然說話。多人談話、音樂或電視聲會影響相似度。</Text>
+              <Text style={[styles.uploadTip, { color: colors.muted }]}>支援 MP3、WAV、M4A、MP4、MOV 等格式。短片段也可生成；若有較長、較清楚的單人說話素材，通常相似度會更穩定。</Text>
             </View>
 
             <View style={[styles.textCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -467,11 +445,8 @@ const styles = StyleSheet.create({
   refreshText: { fontSize: 12, fontWeight: "700" },
   uploadCard: { borderRadius: 20, padding: 20, gap: 12, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
   uploadHeading: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  mediaPickerActions: { flexDirection: "row", gap: 10 },
   uploadButton: { minHeight: 52, borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 9 },
   uploadButtonText: { fontSize: 14, fontWeight: "700" },
-  videoLibraryButton: { minHeight: 52, borderRadius: 14, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  videoLibraryButtonText: { fontSize: 13, fontWeight: "700" },
   selectedMediaContent: { gap: 12 },
   uploadedFile: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
   uploadedFileName: { fontSize: 14, fontWeight: "700" },

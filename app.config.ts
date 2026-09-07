@@ -100,12 +100,6 @@ const config: ExpoConfig = {
       },
     ],
     [
-      "expo-image-picker",
-      {
-        photosPermission: "允許迴響存取你的相簿，以選擇含有親友聲音的影片。",
-      },
-    ],
-    [
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",

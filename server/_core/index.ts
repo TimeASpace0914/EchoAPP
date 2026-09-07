@@ -159,7 +159,7 @@ async function startServer() {
         res.status(result.code === "QUALITY_REJECTED" ? 422 : 502).json({ success: false, error: result.error, details: result.details });
         return;
       }
-      res.json({ success: true, profileId: result.profile_id, name: result.name });
+      res.json({ success: true, profileId: result.profile_id, name: result.name, qualityWarnings: result.qualityWarnings ?? [] });
     } catch (error) {
       res.status(500).json({ success: false, error: error instanceof Error ? error.message : "未知錯誤" });
     }

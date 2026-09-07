@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { getReferenceQualityRejection } from "../server/voicebox";
+import { getReferenceQualityRejection, getReferenceQualityWarnings } from "../server/voicebox";
 
 describe("getReferenceQualityRejection", () => {
-  it("rejects a short reference before a Voicebox Profile is created", () => {
-    const result = getReferenceQualityRejection({
+  it("allows short references with a clear quality reminder", () => {
+    const quality = {
       durationSeconds: 12.5,
       effectiveSpeechSeconds: 11,
       meanVolumeDb: -20,
       maxVolumeDb: -3,
-    });
+    };
 
-    expect(result?.code).toBe("QUALITY_REJECTED");
-    expect(result?.error).toContain("過短");
+    expect(getReferenceQualityRejection(quality)).toBeNull();
+    expect(getReferenceQualityWarnings(quality)[0]).toContain("仍可生成");
   });
 
   it("accepts a sufficiently long, clear and non-clipped reference", () => {
@@ -23,5 +23,16 @@ describe("getReferenceQualityRejection", () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it("still rejects a media file with practically no usable speech", () => {
+    const result = getReferenceQualityRejection({
+      durationSeconds: 10,
+      effectiveSpeechSeconds: 0.5,
+      meanVolumeDb: -20,
+      maxVolumeDb: -3,
+    });
+
+    expect(result?.code).toBe("QUALITY_REJECTED");
   });
 });

@@ -336,37 +336,34 @@ export type VoiceboxError = {
   details?: string;
 };
 
-/** 將可量測的品質問題轉為家屬可理解的更換素材建議。 */
+/** 僅攔截幾乎沒有可用人聲的素材；短片段仍可由家屬選擇繼續生成。 */
 export function getReferenceQualityRejection(quality: ReferenceAudioQuality): VoiceboxError | null {
-  if (quality.durationSeconds !== null && quality.durationSeconds < 20) {
+  if (quality.effectiveSpeechSeconds !== null && quality.effectiveSpeechSeconds < 1) {
     return {
-      error: "參考音檔過短，暫不建立聲音身份",
+      error: "參考素材幾乎沒有可用人聲",
       code: "QUALITY_REJECTED",
-      details: `目前只有 ${quality.durationSeconds.toFixed(1)} 秒；請提供至少 20 秒、建議 45–90 秒的單人自然說話片段。`,
-    };
-  }
-  if (quality.effectiveSpeechSeconds !== null && quality.effectiveSpeechSeconds < 15) {
-    return {
-      error: "參考音檔的有效語音不足",
-      code: "QUALITY_REJECTED",
-      details: `偵測到約 ${quality.effectiveSpeechSeconds.toFixed(1)} 秒有效人聲；請裁掉長靜音、音樂或其他人說話後再上傳。`,
-    };
-  }
-  if (quality.meanVolumeDb !== null && quality.meanVolumeDb < -42) {
-    return {
-      error: "參考音檔音量過低",
-      code: "QUALITY_REJECTED",
-      details: `平均音量約 ${quality.meanVolumeDb.toFixed(1)} dB；請改用說話者更靠近麥克風、內容更清楚的片段。`,
-    };
-  }
-  if (quality.maxVolumeDb !== null && quality.maxVolumeDb >= -0.1) {
-    return {
-      error: "參考音檔可能有爆音或 clipping",
-      code: "QUALITY_REJECTED",
-      details: `峰值約 ${quality.maxVolumeDb.toFixed(1)} dB；請改用沒有破音、突然大聲或麥克風失真的片段。`,
+      details: `偵測到約 ${quality.effectiveSpeechSeconds.toFixed(1)} 秒有效人聲。請確認素材不是空白、只有音樂或完全沒有說話內容。`,
     };
   }
   return null;
+}
+
+/** 將不阻斷生成的品質風險轉為可顯示提醒。 */
+export function getReferenceQualityWarnings(quality: ReferenceAudioQuality): string[] {
+  const warnings: string[] = [];
+  if (quality.durationSeconds !== null && quality.durationSeconds < 20) {
+    warnings.push(`素材長度約 ${quality.durationSeconds.toFixed(1)} 秒，仍可生成；若結果不夠相似，可改用 20 秒以上的單人語音再比較。`);
+  }
+  if (quality.effectiveSpeechSeconds !== null && quality.effectiveSpeechSeconds < 15 && quality.effectiveSpeechSeconds >= 1) {
+    warnings.push(`有效人聲約 ${quality.effectiveSpeechSeconds.toFixed(1)} 秒，仍可繼續；移除長靜音、音樂或他人插話有助提高相似度。`);
+  }
+  if (quality.meanVolumeDb !== null && quality.meanVolumeDb < -42) {
+    warnings.push("素材音量偏低，仍可生成；較清楚、靠近麥克風的片段通常效果更好。");
+  }
+  if (quality.maxVolumeDb !== null && quality.maxVolumeDb >= -0.1) {
+    warnings.push("素材可能有爆音或破音，仍可生成；若聲音失真，建議再換較清楚的片段。");
+  }
+  return warnings;
 }
 
 function isVoiceboxError(r: unknown): r is VoiceboxError {
@@ -416,7 +413,7 @@ export async function uploadVoiceProfile(
   referenceText?: string,
   personality?: string,
   description?: string,
-): Promise<{ profile_id: string; name: string } | VoiceboxError> {
+): Promise<{ profile_id: string; name: string; qualityWarnings: string[] } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
   const inputExt = mimeType.includes("wav") ? "wav"
     : mimeType.includes("mp3") || mimeType.includes("mpeg") ? "mp3"
@@ -433,6 +430,10 @@ export async function uploadVoiceProfile(
   if (qualityRejection) {
     console.warn(`[Voicebox] Reference rejected before Profile creation: ${qualityRejection.error} (${qualityRejection.details})`);
     return qualityRejection;
+  }
+  const qualityWarnings = getReferenceQualityWarnings(quality);
+  if (qualityWarnings.length > 0) {
+    console.warn(`[Voicebox] Reference quality reminders: ${qualityWarnings.join(" | ")}`);
   }
   console.log(`[Voicebox] Reference quality accepted: duration=${quality.durationSeconds?.toFixed(1) ?? "unknown"}s, effective=${quality.effectiveSpeechSeconds?.toFixed(1) ?? "unknown"}s, mean=${quality.meanVolumeDb?.toFixed(1) ?? "unknown"}dB, peak=${quality.maxVolumeDb?.toFixed(1) ?? "unknown"}dB`);
 
@@ -601,7 +602,7 @@ export async function uploadVoiceProfile(
         console.warn(
           `[Voicebox] sample upload returned HTTP ${sampleRes.status}, but a sample exists on ${profileId}`,
         );
-        return { profile_id: profileId, name };
+        return { profile_id: profileId, name, qualityWarnings };
       }
       console.error(`[Voicebox] Sample upload failed: HTTP ${sampleRes.status}: ${errText.substring(0, 200)}`);
       return {
@@ -612,12 +613,12 @@ export async function uploadVoiceProfile(
     }
 
     console.log(`[Voicebox] Sample uploaded successfully for profile ${profileId}`);
-    return { profile_id: profileId, name };
+    return { profile_id: profileId, name, qualityWarnings };
   } catch (error) {
     const recoveredSample = await recoverUploadedSample(baseUrl, profileId);
     if (recoveredSample) {
       console.warn(`[Voicebox] sample upload response lost, recovered saved sample on ${profileId}`);
-      return { profile_id: profileId, name };
+      return { profile_id: profileId, name, qualityWarnings };
     }
     console.error(`[Voicebox] Sample upload error:`, error instanceof Error ? error.message : error);
     return {

@@ -137,13 +137,14 @@ export interface HistoryEntry {
   voiceProfileName?: string;
 }
 
-/** 建立新聲音身份所需的最低音檔時長（秒） */
-export const MIN_AUDIO_DURATION = 20;
+/** 建議的參考音檔時長（秒）；短片段仍可用於生成。 */
+export const RECOMMENDED_AUDIO_DURATION = 20;
 
 /** 音檔驗證結果 */
 export interface AudioValidationResult {
   valid: boolean;
   error?: string;
+  warning?: string;
   duration?: number;
   mediaType?: ReferenceMediaType;
 }
@@ -215,11 +216,12 @@ export async function validateAudioFile(
 
   try {
     const duration = await getAudioDuration(uri);
-    if (duration < MIN_AUDIO_DURATION) {
+    if (duration < RECOMMENDED_AUDIO_DURATION) {
       return {
-        valid: false,
+        valid: true,
         duration,
-        error: `音檔長度僅 ${duration.toFixed(1)} 秒。建立聲音身份至少需要 ${MIN_AUDIO_DURATION} 秒，建議提供 45–90 秒的單人自然說話片段。`,
+        mediaType,
+        warning: `這段聲音約 ${duration.toFixed(1)} 秒，仍可用於生成；較短片段的相似度與穩定度可能較低。若日後找到更長、更清楚的片段，可再比較結果。`,
       };
     }
     return { valid: true, duration, mediaType };
@@ -312,7 +314,7 @@ async function restUploadProfile(
   referenceText?: string,
   personality?: string,
   description?: string,
-): Promise<{ profileId: string; name: string }> {
+): Promise<{ profileId: string; name: string; qualityWarnings: string[] }> {
   const apiBase = getApiBaseUrl();
   let response: Response;
   try {
@@ -350,11 +352,12 @@ async function restUploadProfile(
     success?: boolean;
     profileId?: string;
     name?: string;
+    qualityWarnings?: string[];
     error?: string;
   };
 
   if (data.success && data.profileId) {
-    return { profileId: data.profileId, name: data.name || name };
+    return { profileId: data.profileId, name: data.name || name, qualityWarnings: data.qualityWarnings ?? [] };
   }
   throw new Error(
     data.error || "伺服器未返回聲音檔案 ID，請確認 Voicebox 伺服器正常運作。"
@@ -502,6 +505,10 @@ export async function createVoiceProfile(
     params.description,
   );
 
+  if (uploadResult.qualityWarnings.length > 0 && onProgress) {
+    onProgress(80, `品質提醒：${uploadResult.qualityWarnings[0]}`);
+  }
+
   if (onProgress) onProgress(100, "候選聲音已建立");
   return uploadResult;
 }
@@ -620,6 +627,10 @@ export async function generateSpeech(
         params.description,  // description → Voicebox profile name (可選)
       );
       voiceProfileId = uploadResult?.profileId ?? undefined;
+
+      if (uploadResult.qualityWarnings.length > 0 && onProgress) {
+        onProgress(30, `品質提醒：${uploadResult.qualityWarnings[0]}`);
+      }
 
       if (!voiceProfileId) {
         throw new Error("無法建立聲音檔案，請確認語音克隆伺服器正常運作後再試。");

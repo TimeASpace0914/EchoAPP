@@ -118,7 +118,7 @@ export function VoiceIdentityManager() {
 
   const createCandidate = useCallback(async () => {
     if (!audioUri) {
-      Alert.alert("請先選擇授權音檔", "建立候選聲音前，請選擇至少 20 秒的單人自然說話音檔。");
+      Alert.alert("請先選擇授權音檔", "建立候選聲音前，請選擇有清楚人聲的授權音檔；20 秒以上通常可得到較穩定的結果。 ");
       return;
     }
     if (!isSingleSpeakerConfirmed) {
@@ -283,7 +283,7 @@ export function VoiceIdentityManager() {
 
       <View style={[styles.card, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>建立候選聲音</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>請使用至少 20 秒、建議 45–90 秒的單人自然說話片段，並輸入與音檔相符的文字。</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>短片段也可建立候選聲音；20 秒以上、建議 45–90 秒的單人自然說話片段通常更穩定。請盡量輸入與音檔相符的文字。</Text>
 
         {audioUri ? (
           <View style={[styles.fileBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
