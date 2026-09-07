@@ -15,6 +15,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import Slider from "@react-native-community/slider";
+import * as DocumentPicker from "expo-document-picker";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Logo } from "@/components/logo";
@@ -28,6 +29,7 @@ import {
   generateSpeech,
   getVoiceboxProfiles,
   saveHistoryEntry,
+  validateAudioFile,
   type HistoryEntry,
 } from "@/lib/voice-service";
 import {
@@ -56,6 +58,10 @@ export default function HomeScreen() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [speed, setSpeed] = useState(1);
+  const [referenceAudioUri, setReferenceAudioUri] = useState<string | null>(null);
+  const [referenceAudioName, setReferenceAudioName] = useState("");
+  const [referenceAudioMimeType, setReferenceAudioMimeType] = useState<string | null>(null);
+  const [isValidatingAudio, setIsValidatingAudio] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ManagedVoiceProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -137,9 +143,35 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [isGenerating]);
 
+  const pickReferenceAudio = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["audio/*", "audio/wav", "audio/mpeg", "audio/mp3", "audio/m4a", "audio/flac", "audio/ogg"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      setIsValidatingAudio(true);
+      const validation = await validateAudioFile(asset.uri, asset.name || "");
+      if (!validation.valid) {
+        Alert.alert("音檔不符合使用條件", validation.error || "請改用更清楚的音檔。 ");
+        return;
+      }
+      setReferenceAudioUri(asset.uri);
+      setReferenceAudioName(asset.name || "未命名音檔");
+      setReferenceAudioMimeType(asset.mimeType || null);
+      if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      Alert.alert("無法選擇音檔", "請確認檔案格式後再試一次。 ");
+    } finally {
+      setIsValidatingAudio(false);
+    }
+  }, []);
+
   const handleGenerate = useCallback(async () => {
-    if (!activeProfile) {
-      Alert.alert("尚未完成聲音設定", "請聯繫服務人員確認親友的正式聲音身份已設定完成。 ");
+    if (!activeProfile && !referenceAudioUri) {
+      Alert.alert("尚未完成聲音設定", "請聯繫服務人員確認親友的正式聲音身份，或先上傳一段授權音檔。 ");
       return;
     }
     if (!text.trim()) {
@@ -156,9 +188,13 @@ export default function HomeScreen() {
 
     const primaryEmotion = selectedEmotion || undefined;
     const spokenText = stripPronunciationMarkers(text.trim());
+    const isOneTimeReference = Boolean(referenceAudioUri);
     try {
       const result = await generateSpeech({
-        voiceProfileId: activeProfile.id,
+        voiceProfileId: isOneTimeReference ? undefined : activeProfile?.id,
+        referenceAudioUri: referenceAudioUri || undefined,
+        audioFileName: referenceAudioName || undefined,
+        audioMimeType: referenceAudioMimeType || undefined,
         text: text.trim(),
         language: "zh",
         instruct: personality.trim() || undefined,
@@ -174,14 +210,14 @@ export default function HomeScreen() {
         id: `echo_${result.createdAt}`,
         text: spokenText,
         audioUri: result.audioUri,
-        referenceAudioName: activeProfile.name,
+        referenceAudioName: isOneTimeReference ? referenceAudioName : activeProfile?.name || "已核可聲音",
         duration: result.duration,
         createdAt: result.createdAt,
         isRealVoice: result.isRealVoice,
         emotion: primaryEmotion,
         speed: speed !== 1 ? speed : undefined,
         profileId: result.profileId,
-        voiceProfileName: activeProfile.name,
+        voiceProfileName: isOneTimeReference ? referenceAudioName : activeProfile?.name,
       };
       await saveHistoryEntry(entry);
       generationStore.completeGeneration({
@@ -213,7 +249,7 @@ export default function HomeScreen() {
     } finally {
       setIsGenerating(false);
     }
-  }, [activeProfile, personality, selectedEmotion, speed, text]);
+  }, [activeProfile, personality, referenceAudioMimeType, referenceAudioName, referenceAudioUri, selectedEmotion, speed, text]);
 
   const formatElapsed = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -237,14 +273,40 @@ export default function HomeScreen() {
         <Animated.View style={[{ flex: 1 }, contentAnimatedStyle]}>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={[styles.voiceStatusCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
-              <View style={[styles.voiceStatusIcon, { backgroundColor: activeProfile ? `${colors.success}15` : `${colors.muted}12` }]}>
-                <IconSymbol name={activeProfile ? "checkmark.circle.fill" : "info.circle"} size={24} color={activeProfile ? colors.success : colors.muted} />
+              <View style={[styles.voiceStatusIcon, { backgroundColor: referenceAudioUri || activeProfile ? `${colors.success}15` : `${colors.muted}12` }]}>
+                <IconSymbol name={referenceAudioUri || activeProfile ? "checkmark.circle.fill" : "info.circle"} size={24} color={referenceAudioUri || activeProfile ? colors.success : colors.muted} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.voiceStatusTitle, { color: colors.foreground }]}>{isLoadingProfile ? "正在確認聲音設定" : activeProfile ? "親友的聲音已準備好" : "尚未完成聲音設定"}</Text>
-                <Text style={[styles.voiceStatusText, { color: colors.muted }]}>{isLoadingProfile ? "請稍候..." : activeProfile ? "已套用核可的聲音版本，您可直接輸入想說的話。" : profileError || "請聯繫服務人員協助完成聲音設定。"}</Text>
+                <Text style={[styles.voiceStatusTitle, { color: colors.foreground }]}>{referenceAudioUri ? "本次上傳音檔已準備好" : isLoadingProfile ? "正在確認聲音設定" : activeProfile ? "親友的聲音已準備好" : "尚未完成聲音設定"}</Text>
+                <Text style={[styles.voiceStatusText, { color: colors.muted }]}>{referenceAudioUri ? "本次會使用您選擇的音檔進行克隆，不會變更管理者核可的正式聲音。" : isLoadingProfile ? "請稍候..." : activeProfile ? "已套用核可的聲音版本，您可直接輸入想說的話。" : profileError || "您也可以直接上傳一段授權音檔，建立本次使用的聲音。"}</Text>
               </View>
               {!isLoadingProfile ? <TouchableOpacity onPress={() => void loadActiveProfile()} style={[styles.refreshButton, { borderColor: colors.border }]}><Text style={[styles.refreshText, { color: colors.foreground }]}>更新</Text></TouchableOpacity> : null}
+            </View>
+
+            <View style={[styles.uploadCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
+              <View style={styles.uploadHeading}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>上傳親友音檔</Text>
+                  <Text style={[styles.cardHint, { color: colors.muted }]}>可選。上傳後只用於本次生成，不會更改服務人員核可的正式聲音。</Text>
+                </View>
+                <IconSymbol name="cloud.fill" size={24} color={colors.primary} />
+              </View>
+              {referenceAudioUri ? (
+                <View style={[styles.uploadedFile, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.uploadedFileName, { color: colors.foreground }]} numberOfLines={1}>{referenceAudioName}</Text>
+                    <Text style={[styles.uploadedFileHint, { color: colors.muted }]}>已通過格式與時長檢查・本次優先使用</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => void pickReferenceAudio()} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.primary }]}>更換</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setReferenceAudioUri(null); setReferenceAudioName(""); setReferenceAudioMimeType(null); }} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.muted }]}>移除</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => void pickReferenceAudio()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.uploadButton, { borderColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
+                  {isValidatingAudio ? <ActivityIndicator color={colors.primary} /> : <IconSymbol name="cloud.fill" size={20} color={colors.primary} />}
+                  <Text style={[styles.uploadButtonText, { color: colors.primary }]}>{isValidatingAudio ? "正在檢查音檔..." : "選擇授權音檔"}</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={[styles.uploadTip, { color: colors.muted }]}>至少 20 秒；建議 45–90 秒的單人自然說話。多人談話、音樂或電視聲會影響相似度。</Text>
             </View>
 
             <View style={[styles.textCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -312,7 +374,7 @@ export default function HomeScreen() {
                 <TouchableOpacity onPress={() => { setGenError(null); generationStore.reset(); }} style={[styles.dismissButton, { borderColor: colors.border }]}><Text style={[styles.dismissButtonText, { color: colors.foreground }]}>關閉</Text></TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity onPress={handleGenerate} disabled={!activeProfile || isLoadingProfile} activeOpacity={0.85} style={[styles.generateButton, { backgroundColor: colors.primary, opacity: activeProfile && !isLoadingProfile ? 1 : 0.4 }]}><Text style={[styles.generateButtonText, { color: colors.background }]}>{isLoadingProfile ? "確認聲音設定中..." : activeProfile ? "生成語音" : "等待聲音設定"}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={handleGenerate} disabled={(!activeProfile && !referenceAudioUri) || isLoadingProfile} activeOpacity={0.85} style={[styles.generateButton, { backgroundColor: colors.primary, opacity: (activeProfile || referenceAudioUri) && !isLoadingProfile ? 1 : 0.4 }]}><Text style={[styles.generateButtonText, { color: colors.background }]}>{isLoadingProfile ? "確認聲音設定中..." : activeProfile || referenceAudioUri ? "生成語音" : "等待聲音設定"}</Text></TouchableOpacity>
             )}
           </ScrollView>
         </Animated.View>
@@ -332,6 +394,15 @@ const styles = StyleSheet.create({
   voiceStatusText: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   refreshButton: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
   refreshText: { fontSize: 12, fontWeight: "700" },
+  uploadCard: { borderRadius: 20, padding: 20, gap: 12, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
+  uploadHeading: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  uploadButton: { minHeight: 52, borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 9 },
+  uploadButtonText: { fontSize: 14, fontWeight: "700" },
+  uploadedFile: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
+  uploadedFileName: { fontSize: 14, fontWeight: "700" },
+  uploadedFileHint: { fontSize: 12, marginTop: 3 },
+  fileActionText: { fontSize: 13, fontWeight: "700" },
+  uploadTip: { fontSize: 12, lineHeight: 18 },
   textCard: { borderRadius: 20, padding: 20, gap: 10, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
   cardTitle: { fontSize: 19, fontWeight: "700" },
   cardHint: { fontSize: 14, lineHeight: 21 },
