@@ -14,6 +14,21 @@ import {
   createPhoneticSurrogateText,
   stripPronunciationMarkers,
 } from "@/lib/pinyin-helpers";
+import {
+  ALL_SUPPORTED_EXTENSIONS,
+  getReferenceMediaType,
+  SUPPORTED_AUDIO_EXTENSIONS,
+  SUPPORTED_VIDEO_EXTENSIONS,
+  type ReferenceMediaType,
+} from "@/lib/reference-media";
+
+export {
+  ALL_SUPPORTED_EXTENSIONS,
+  getReferenceMediaType,
+  SUPPORTED_AUDIO_EXTENSIONS,
+  SUPPORTED_VIDEO_EXTENSIONS,
+  type ReferenceMediaType,
+};
 
 /**
  * 建立帶超時的 AbortSignal（相容舊版裝置不支援 AbortSignal.timeout）
@@ -122,18 +137,6 @@ export interface HistoryEntry {
   voiceProfileName?: string;
 }
 
-/** 支援的音檔格式 */
-export const SUPPORTED_AUDIO_EXTENSIONS = [
-  "mp3", "wav", "m4a", "flac", "ogg", "wma",
-];
-
-/** 支援的影片格式（保留匯出以避免破壞其他模組） */
-export const SUPPORTED_VIDEO_EXTENSIONS: string[] = [];
-
-export const ALL_SUPPORTED_EXTENSIONS = [
-  ...SUPPORTED_AUDIO_EXTENSIONS,
-];
-
 /** 建立新聲音身份所需的最低音檔時長（秒） */
 export const MIN_AUDIO_DURATION = 20;
 
@@ -142,6 +145,7 @@ export interface AudioValidationResult {
   valid: boolean;
   error?: string;
   duration?: number;
+  mediaType?: ReferenceMediaType;
 }
 
 const HISTORY_KEY = "@echo_history";
@@ -181,12 +185,12 @@ export async function validateAudioFile(
     };
   }
 
-  const isAudio = SUPPORTED_AUDIO_EXTENSIONS.includes(ext);
+  const mediaType = getReferenceMediaType(fileName || uri);
 
-  if (!isAudio) {
+  if (!mediaType) {
     return {
       valid: false,
-      error: `不支援此檔案格式（.${ext}）。請使用 ${SUPPORTED_AUDIO_EXTENSIONS.join("、")} 格式。`,
+      error: `不支援此檔案格式（.${ext}）。請使用音檔（${SUPPORTED_AUDIO_EXTENSIONS.join("、")}）或手機影片（${SUPPORTED_VIDEO_EXTENSIONS.join("、")}）。`,
     };
   }
 
@@ -203,8 +207,11 @@ export async function validateAudioFile(
   }
 
   if (Platform.OS === "web") {
-    return { valid: true };
+    return { valid: true, mediaType };
   }
+
+  // 手機影片的音軌會由伺服器端 ffmpeg 擷取；不要在裝置端以音訊播放器錯誤判定影片失敗。
+  if (mediaType === "video") return { valid: true, mediaType };
 
   try {
     const duration = await getAudioDuration(uri);
@@ -215,9 +222,9 @@ export async function validateAudioFile(
         error: `音檔長度僅 ${duration.toFixed(1)} 秒。建立聲音身份至少需要 ${MIN_AUDIO_DURATION} 秒，建議提供 45–90 秒的單人自然說話片段。`,
       };
     }
-    return { valid: true, duration };
+    return { valid: true, duration, mediaType };
   } catch {
-    return { valid: true };
+    return { valid: true, mediaType };
   }
 }
 

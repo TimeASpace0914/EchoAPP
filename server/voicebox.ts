@@ -19,9 +19,8 @@ import os from "os";
 const execFileAsync = promisify(execFile);
 
 /**
- * 使用 ffmpeg 將任意音檔格式轉換為 WAV
- * 保留原始採樣率和聲道數，只轉換容器格式為 WAV。
- * Voicebox 對 WAV 格式的相容性最佳，M4A/MP4 等容器常被拒絕。
+ * 使用 ffmpeg 將音檔或手機影片中的第一個音軌轉換為 WAV。
+ * Voicebox 對 WAV 格式的相容性最佳，M4A／MP4／MOV 等容器會先標準化。
  */
 async function convertToWav(inputBuffer: Buffer, inputExt: string): Promise<Buffer> {
   const tmpDir = os.tmpdir();
@@ -419,7 +418,16 @@ export async function uploadVoiceProfile(
   description?: string,
 ): Promise<{ profile_id: string; name: string } | VoiceboxError> {
   const baseUrl = getVoiceboxUrl();
-  const inputExt = mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : mimeType.includes("flac") ? "flac" : mimeType.includes("ogg") ? "ogg" : mimeType.includes("aac") ? "aac" : "m4a";
+  const inputExt = mimeType.includes("wav") ? "wav"
+    : mimeType.includes("mp3") || mimeType.includes("mpeg") ? "mp3"
+      : mimeType.includes("flac") ? "flac"
+        : mimeType.includes("ogg") ? "ogg"
+          : mimeType.includes("aac") ? "aac"
+            : mimeType.includes("quicktime") ? "mov"
+              : mimeType.includes("3gpp") ? "3gp"
+                : mimeType.includes("webm") ? "webm"
+                  : mimeType.includes("video/mp4") ? "mp4"
+                    : "m4a";
   const quality = await analyzeReferenceAudio(Buffer.from(audioBase64, "base64"), inputExt);
   const qualityRejection = getReferenceQualityRejection(quality);
   if (qualityRejection) {
@@ -485,6 +493,7 @@ export async function uploadVoiceProfile(
   // 步驟 2：上傳參考音檔（先轉換為 WAV，再構建 multipart/form-data）
   try {
     let binaryData: Buffer = Buffer.from(audioBase64, "base64");
+    const isVideoReference = mimeType.startsWith("video/");
     
     // 正確映射 MIME type 到副檔名
     const extMap: Record<string, string> = {
@@ -500,6 +509,11 @@ export async function uploadVoiceProfile(
       "audio/ogg": "ogg",
       "audio/x-wma": "wma",
       "audio/webm": "webm",
+      "video/mp4": "mp4",
+      "video/quicktime": "mov",
+      "video/x-m4v": "m4v",
+      "video/3gpp": "3gp",
+      "video/webm": "webm",
     };
     const originalExt = extMap[mimeType] || "wav";
     
@@ -515,6 +529,12 @@ export async function uploadVoiceProfile(
         binaryData = convertedBuffer;
         uploadMimeType = "audio/wav";
         uploadExt = "wav";
+      } else if (isVideoReference) {
+        return {
+          error: "影片音軌擷取失敗",
+          code: "UPLOAD_FAILED",
+          details: "此影片找不到可用的聲音軌，或其編碼格式不支援。請改用含有人聲的 MP4／MOV，或先從影片匯出音檔。",
+        };
       }
     }
     

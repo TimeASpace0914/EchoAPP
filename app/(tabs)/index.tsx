@@ -16,9 +16,11 @@ import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import Slider from "@react-native-community/slider";
 import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Logo } from "@/components/logo";
+import { ReferenceMediaPreview } from "@/components/reference-media-preview";
 import { ScreenContainer } from "@/components/screen-container";
 import { Waveform } from "@/components/waveform";
 import { useColors } from "@/hooks/use-colors";
@@ -51,6 +53,15 @@ const EMOTION_OPTIONS = [
   { label: "鼓勵", value: "鼓勵振奮，語氣堅定有力量，讓人感到被支持" },
 ] as const;
 
+type PickedReferenceMedia = {
+  uri: string;
+  name?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+};
+
+const MAX_REFERENCE_MEDIA_BYTES = 32 * 1024 * 1024;
+
 export default function HomeScreen() {
   const colors = useColors();
   const [text, setText] = useState("");
@@ -61,6 +72,9 @@ export default function HomeScreen() {
   const [referenceAudioUri, setReferenceAudioUri] = useState<string | null>(null);
   const [referenceAudioName, setReferenceAudioName] = useState("");
   const [referenceAudioMimeType, setReferenceAudioMimeType] = useState<string | null>(null);
+  const [referenceMediaType, setReferenceMediaType] = useState<"audio" | "video" | null>(null);
+  const [referenceDescription, setReferenceDescription] = useState("");
+  const [referenceText, setReferenceText] = useState("");
   const [isValidatingAudio, setIsValidatingAudio] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ManagedVoiceProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -143,31 +157,63 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [isGenerating]);
 
-  const pickReferenceAudio = useCallback(async () => {
+  const acceptReferenceMedia = useCallback(async (asset: PickedReferenceMedia) => {
+    setIsValidatingAudio(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["audio/*", "audio/wav", "audio/mpeg", "audio/mp3", "audio/m4a", "audio/flac", "audio/ogg"],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-      setIsValidatingAudio(true);
-      const validation = await validateAudioFile(asset.uri, asset.name || "");
+      const displayName = asset.name || "未命名媒體";
+      if (asset.size && asset.size > MAX_REFERENCE_MEDIA_BYTES) {
+        Alert.alert("素材檔案過大", "目前單次上傳請控制在 32MB 內。若是手機影片，請使用「手機影片」按鈕從相簿選擇，系統會輸出較相容的影片；或先在手機中剪成 45–90 秒的片段。 ");
+        return;
+      }
+      const validation = await validateAudioFile(asset.uri, displayName);
       if (!validation.valid) {
-        Alert.alert("音檔不符合使用條件", validation.error || "請改用更清楚的音檔。 ");
+        Alert.alert("音檔不符合使用條件", validation.error || "請改用更清楚的音檔或影片。 ");
         return;
       }
       setReferenceAudioUri(asset.uri);
-      setReferenceAudioName(asset.name || "未命名音檔");
+      setReferenceAudioName(displayName);
       setReferenceAudioMimeType(asset.mimeType || null);
+      setReferenceMediaType(validation.mediaType || (asset.mimeType?.startsWith("video/") ? "video" : "audio"));
       if (Platform.OS !== "web") void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
-      Alert.alert("無法選擇音檔", "請確認檔案格式後再試一次。 ");
+      Alert.alert("無法讀取媒體", "請確認檔案或影片內容完整後再試一次。 ");
     } finally {
       setIsValidatingAudio(false);
     }
   }, []);
+
+  const pickReferenceMediaFromFiles = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["audio/*", "video/*", "audio/wav", "audio/mpeg", "audio/mp3", "audio/m4a", "audio/flac", "audio/ogg", "video/mp4", "video/quicktime", "video/3gpp", "video/webm"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      await acceptReferenceMedia(result.assets[0]);
+    } catch {
+      Alert.alert("無法選擇媒體", "請確認音檔或影片格式後再試一次。 ");
+    }
+  }, [acceptReferenceMedia]);
+
+  const pickVideoFromLibrary = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["videos"],
+        quality: 1,
+        videoExportPreset: ImagePicker.VideoExportPreset.H264_640x480,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      await acceptReferenceMedia({
+        uri: asset.uri,
+        name: asset.fileName || `手機影片_${Date.now()}.mov`,
+        mimeType: asset.mimeType,
+        size: asset.fileSize,
+      });
+    } catch {
+      Alert.alert("無法開啟相簿", "請確認相簿存取權限後再試一次。 ");
+    }
+  }, [acceptReferenceMedia]);
 
   const handleGenerate = useCallback(async () => {
     if (!activeProfile && !referenceAudioUri) {
@@ -195,6 +241,8 @@ export default function HomeScreen() {
         referenceAudioUri: referenceAudioUri || undefined,
         audioFileName: referenceAudioName || undefined,
         audioMimeType: referenceAudioMimeType || undefined,
+        description: referenceDescription.trim() || undefined,
+        referenceText: referenceText.trim() || undefined,
         text: text.trim(),
         language: "zh",
         instruct: personality.trim() || undefined,
@@ -249,7 +297,7 @@ export default function HomeScreen() {
     } finally {
       setIsGenerating(false);
     }
-  }, [activeProfile, personality, referenceAudioMimeType, referenceAudioName, referenceAudioUri, selectedEmotion, speed, text]);
+  }, [activeProfile, personality, referenceAudioMimeType, referenceAudioName, referenceAudioUri, referenceDescription, referenceText, selectedEmotion, speed, text]);
 
   const formatElapsed = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -277,8 +325,8 @@ export default function HomeScreen() {
                 <IconSymbol name={referenceAudioUri || activeProfile ? "checkmark.circle.fill" : "info.circle"} size={24} color={referenceAudioUri || activeProfile ? colors.success : colors.muted} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.voiceStatusTitle, { color: colors.foreground }]}>{referenceAudioUri ? "本次上傳音檔已準備好" : isLoadingProfile ? "正在確認聲音設定" : activeProfile ? "親友的聲音已準備好" : "尚未完成聲音設定"}</Text>
-                <Text style={[styles.voiceStatusText, { color: colors.muted }]}>{referenceAudioUri ? "本次會使用您選擇的音檔進行克隆，不會變更管理者核可的正式聲音。" : isLoadingProfile ? "請稍候..." : activeProfile ? "已套用核可的聲音版本，您可直接輸入想說的話。" : profileError || "您也可以直接上傳一段授權音檔，建立本次使用的聲音。"}</Text>
+                <Text style={[styles.voiceStatusTitle, { color: colors.foreground }]}>{referenceAudioUri ? "本次上傳素材已準備好" : isLoadingProfile ? "正在確認聲音設定" : activeProfile ? "親友的聲音已準備好" : "尚未完成聲音設定"}</Text>
+                <Text style={[styles.voiceStatusText, { color: colors.muted }]}>{referenceAudioUri ? "本次會使用您選擇的素材進行克隆，不會變更管理者核可的正式聲音。" : isLoadingProfile ? "請稍候..." : activeProfile ? "已套用核可的聲音版本，您可直接輸入想說的話。" : profileError || "您也可以直接上傳一段授權音檔或影片，建立本次使用的聲音。"}</Text>
               </View>
               {!isLoadingProfile ? <TouchableOpacity onPress={() => void loadActiveProfile()} style={[styles.refreshButton, { borderColor: colors.border }]}><Text style={[styles.refreshText, { color: colors.foreground }]}>更新</Text></TouchableOpacity> : null}
             </View>
@@ -286,27 +334,50 @@ export default function HomeScreen() {
             <View style={[styles.uploadCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
               <View style={styles.uploadHeading}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>上傳親友音檔</Text>
-                  <Text style={[styles.cardHint, { color: colors.muted }]}>可選。上傳後只用於本次生成，不會更改服務人員核可的正式聲音。</Text>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>上傳親友音檔或影片</Text>
+                  <Text style={[styles.cardHint, { color: colors.muted }]}>可選。可直接選擇手機錄製的影片；系統只會取用其中聲音，且不會更改正式聲音。</Text>
                 </View>
                 <IconSymbol name="cloud.fill" size={24} color={colors.primary} />
               </View>
               {referenceAudioUri ? (
-                <View style={[styles.uploadedFile, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.uploadedFileName, { color: colors.foreground }]} numberOfLines={1}>{referenceAudioName}</Text>
-                    <Text style={[styles.uploadedFileHint, { color: colors.muted }]}>已通過格式與時長檢查・本次優先使用</Text>
+                <View style={styles.selectedMediaContent}>
+                  <View style={[styles.uploadedFile, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.uploadedFileName, { color: colors.foreground }]} numberOfLines={1}>{referenceAudioName}</Text>
+                      <Text style={[styles.uploadedFileHint, { color: colors.muted }]}>{referenceMediaType === "video" ? "手機影片・生成時將擷取聲音" : "音檔"}・本次優先使用</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => void pickReferenceMediaFromFiles()} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.primary }]}>更換</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => { setReferenceAudioUri(null); setReferenceAudioName(""); setReferenceAudioMimeType(null); setReferenceMediaType(null); setReferenceDescription(""); setReferenceText(""); }} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.muted }]}>移除</Text></TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => void pickReferenceAudio()} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.primary }]}>更換</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setReferenceAudioUri(null); setReferenceAudioName(""); setReferenceAudioMimeType(null); }} activeOpacity={0.75}><Text style={[styles.fileActionText, { color: colors.muted }]}>移除</Text></TouchableOpacity>
+                  <ReferenceMediaPreview uri={referenceAudioUri} isVideo={referenceMediaType === "video"} colors={colors} />
+                  <View style={styles.referenceFields}>
+                    <View style={styles.fieldLabelRow}>
+                      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>這段聲音的特色</Text>
+                      <Text style={[styles.fieldOptional, { color: colors.muted }]}>選填</Text>
+                    </View>
+                    <TextInput value={referenceDescription} onChangeText={(value) => setReferenceDescription(value.slice(0, 160))} placeholder="例如：爸爸在家中聊天，語氣溫和，說話速度偏慢" placeholderTextColor={colors.muted} style={[styles.referenceInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} multiline maxLength={160} textAlignVertical="top" />
+                    <Text style={[styles.fieldCounter, { color: colors.muted }]}>{referenceDescription.length}/160</Text>
+                    <View style={styles.fieldLabelRow}>
+                      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>您知道的音檔內容</Text>
+                      <Text style={[styles.fieldOptional, { color: colors.muted }]}>選填・可提升專名讀音</Text>
+                    </View>
+                    <TextInput value={referenceText} onChangeText={(value) => setReferenceText(value.slice(0, 500))} placeholder="若記得部分原話，可盡量逐字輸入；不知道可留白，系統會協助轉錄。" placeholderTextColor={colors.muted} style={[styles.referenceTextInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} multiline maxLength={500} textAlignVertical="top" />
+                    <Text style={[styles.fieldCounter, { color: colors.muted }]}>{referenceText.length}/500</Text>
+                  </View>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => void pickReferenceAudio()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.uploadButton, { borderColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
-                  {isValidatingAudio ? <ActivityIndicator color={colors.primary} /> : <IconSymbol name="cloud.fill" size={20} color={colors.primary} />}
-                  <Text style={[styles.uploadButtonText, { color: colors.primary }]}>{isValidatingAudio ? "正在檢查音檔..." : "選擇授權音檔"}</Text>
-                </TouchableOpacity>
+                <View style={styles.mediaPickerActions}>
+                  <TouchableOpacity onPress={() => void pickReferenceMediaFromFiles()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.uploadButton, { flex: 1, borderColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
+                    {isValidatingAudio ? <ActivityIndicator color={colors.primary} /> : <IconSymbol name="cloud.fill" size={20} color={colors.primary} />}
+                    <Text style={[styles.uploadButtonText, { color: colors.primary }]}>{isValidatingAudio ? "正在檢查..." : "選擇音檔或檔案"}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => void pickVideoFromLibrary()} disabled={isValidatingAudio} activeOpacity={0.85} style={[styles.videoLibraryButton, { backgroundColor: colors.primary, opacity: isValidatingAudio ? 0.6 : 1 }]}>
+                    <IconSymbol name="play.fill" size={18} color={colors.background} />
+                    <Text style={[styles.videoLibraryButtonText, { color: colors.background }]}>手機影片</Text>
+                  </TouchableOpacity>
+                </View>
               )}
-              <Text style={[styles.uploadTip, { color: colors.muted }]}>至少 20 秒；建議 45–90 秒的單人自然說話。多人談話、音樂或電視聲會影響相似度。</Text>
+              <Text style={[styles.uploadTip, { color: colors.muted }]}>支援 MP3、WAV、M4A、MP4、MOV 等格式。至少 20 秒；建議 45–90 秒的單人自然說話。多人談話、音樂或電視聲會影響相似度。</Text>
             </View>
 
             <View style={[styles.textCard, { backgroundColor: colors.surface, shadowColor: "#000" }]}>
@@ -396,13 +467,24 @@ const styles = StyleSheet.create({
   refreshText: { fontSize: 12, fontWeight: "700" },
   uploadCard: { borderRadius: 20, padding: 20, gap: 12, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
   uploadHeading: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  mediaPickerActions: { flexDirection: "row", gap: 10 },
   uploadButton: { minHeight: 52, borderWidth: 1.5, borderStyle: "dashed", borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 9 },
   uploadButtonText: { fontSize: 14, fontWeight: "700" },
+  videoLibraryButton: { minHeight: 52, borderRadius: 14, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  videoLibraryButtonText: { fontSize: 13, fontWeight: "700" },
+  selectedMediaContent: { gap: 12 },
   uploadedFile: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
   uploadedFileName: { fontSize: 14, fontWeight: "700" },
   uploadedFileHint: { fontSize: 12, marginTop: 3 },
   fileActionText: { fontSize: 13, fontWeight: "700" },
   uploadTip: { fontSize: 12, lineHeight: 18 },
+  referenceFields: { gap: 7, paddingTop: 2 },
+  fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  fieldLabel: { fontSize: 13, fontWeight: "700" },
+  fieldOptional: { fontSize: 11 },
+  referenceInput: { minHeight: 72, borderRadius: 12, borderWidth: 1, padding: 11, fontSize: 13, lineHeight: 19 },
+  referenceTextInput: { minHeight: 92, borderRadius: 12, borderWidth: 1, padding: 11, fontSize: 13, lineHeight: 19 },
+  fieldCounter: { alignSelf: "flex-end", fontSize: 11, marginTop: -3 },
   textCard: { borderRadius: 20, padding: 20, gap: 10, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
   cardTitle: { fontSize: 19, fontWeight: "700" },
   cardHint: { fontSize: 14, lineHeight: 21 },
