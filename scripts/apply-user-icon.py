@@ -11,6 +11,8 @@ DESTINATIONS = {
     "splash-icon.png": 1024,
     "favicon.png": 256,
     "android-icon-foreground.png": 1024,
+    "android-icon-background.png": 1024,
+    "android-icon-monochrome.png": 1024,
 }
 
 

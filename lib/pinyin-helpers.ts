@@ -29,6 +29,7 @@ const FORCED_PRONUNCIATION_LEXICON: ReadonlyArray<{
   { term: "軟體", pinyin: "ruǎn tǐ", zhuyin: "ㄖㄨㄢˇ ㄊㄧˇ" },
   { term: "緬懷", pinyin: "miǎn huái", zhuyin: "ㄇㄧㄢˇ ㄏㄨㄞˊ" },
   { term: "療癒", pinyin: "liáo yù", zhuyin: "ㄌㄧㄠˊ ㄩˋ" },
+  { term: "優化", pinyin: "yōu huà", zhuyin: "ㄧㄡ ㄏㄨㄚˋ" },
 ];
 
 /** 已知注音到拼音的精準對照，只供使用者標注的三個易錯字使用。 */
@@ -50,7 +51,8 @@ const PHONETIC_SURROGATE_LEXICON: ReadonlyArray<{ source: string; surrogate: str
   { source: "畢業專題", surrogate: "畢業專提" },
   { source: "軟體", surrogate: "阮體" },
   { source: "緬懷", surrogate: "勉懷" },
-  { source: "療癒", surrogate: "遼遇" },
+  { source: "療癒", surrogate: "聊遇" },
+  { source: "優化", surrogate: "悠畫" },
 ];
 
 /**

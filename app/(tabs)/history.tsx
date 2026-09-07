@@ -441,7 +441,7 @@ export default function HistoryScreen() {
                 onPress={handleSaveEdit}
                 style={[styles.editSaveButton, { backgroundColor: colors.primary }]}
               >
-                <Text style={styles.editSaveText}>儲存</Text>
+                <Text style={[styles.editSaveText, { color: colors.background }]}>儲存</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -111,7 +111,7 @@ describe("appendPronunciationHint", () => {
 
 describe("強制讀音詞庫與手動注音覆寫", () => {
   it("should force known rare words and the known name", () => {
-    const hint = generatePronunciationHint("日日誦經，祝禱加持，蔡承諺完成畢業專題，使用軟體緬懷與療癒大家");
+    const hint = generatePronunciationHint("日日誦經，祝禱加持，蔡承諺完成畢業專題，使用軟體緬懷、療癒並優化內容");
     expect(hint).toContain("rì rì sòng jīng");
     expect(hint).toContain("zhù dǎo jiā chí");
     expect(hint).toContain("cài chéng yàn");
@@ -119,6 +119,7 @@ describe("強制讀音詞庫與手動注音覆寫", () => {
     expect(hint).toContain("ruǎn tǐ");
     expect(hint).toContain("miǎn huái");
     expect(hint).toContain("liáo yù");
+    expect(hint).toContain("yōu huà");
   });
 
   it("should honor manual zhuyin overrides", () => {
@@ -142,8 +143,8 @@ describe("強制讀音詞庫與手動注音覆寫", () => {
   });
 
   it("should use pronunciation proxies for the specified common words but keep their customer-visible original text", () => {
-    const original = "畢業專題使用軟體緬懷回憶，也帶來療癒";
-    expect(createPhoneticSurrogateText(original)).toBe("畢業專提使用阮體勉懷回憶，也帶來遼遇");
+    const original = "畢業專題使用軟體緬懷回憶，也帶來療癒與優化";
+    expect(createPhoneticSurrogateText(original)).toBe("畢業專提使用阮體勉懷回憶，也帶來聊遇與悠畫");
     expect(stripPronunciationMarkers(original)).toBe(original);
   });
 });
