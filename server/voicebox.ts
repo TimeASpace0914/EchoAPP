@@ -211,6 +211,16 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string, hintPrompt
 }
 
 /**
+ * Voicebox 會依 reference_text 對齊樣本語音；短、嘈雜或無人聲素材的轉錄容易
+ * 回傳英文碎字或單一填充詞。這些內容若被當成 reference_text，會明顯增加亂語風險。
+ */
+export function isUsableChineseReferenceText(value: string | null | undefined): value is string {
+  if (!value?.trim()) return false;
+  const cjkCharacters = value.match(/[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g) ?? [];
+  return cjkCharacters.length >= 2;
+}
+
+/**
  * 帶重試的 fetch（ngrok 連線不穩定時自動重試）
  */
 async function fetchWithRetry(
@@ -559,17 +569,24 @@ export async function uploadVoiceProfile(
       ? referenceText
       : null;
 
-    // 若沒有提供真實的 reference_text，用 Voicebox 自動轉錄
+    // 若沒有提供真實的 reference_text，用 Voicebox 自動轉錄。
+    // 只接受至少兩個 CJK 字元，避免短素材與雜訊被轉錄成英文碎字後帶來亂語。
     if (!actualReferenceText) {
       console.log(`[Voicebox] No reference_text provided, auto-transcribing audio...`);
       // 用 profile 名稱和描述作為 Whisper 的 prompt 提示，幫助識別人名和專有名詞
       const hintParts = [name, description].filter((s) => s && s.trim().length > 0);
       const hintPrompt = hintParts.length > 0 ? hintParts.join("，") : undefined;
-      actualReferenceText = await transcribeAudio(binaryData, uploadMimeType, hintPrompt);
-      // 若轉錄也失敗，用最小化的通用文字（不會被 AI 當成要說的內容）
-      if (!actualReferenceText) {
-        actualReferenceText = '嗯';
-        console.warn(`[Voicebox] Transcribe failed, using minimal fallback: "${actualReferenceText}"`);
+      const transcript = await transcribeAudio(binaryData, uploadMimeType, hintPrompt);
+      if (isUsableChineseReferenceText(transcript)) {
+        actualReferenceText = transcript.trim();
+      } else {
+        const rejectedTranscript = String(transcript ?? "empty").slice(0, 80);
+        console.warn(`[Voicebox] Unsafe reference transcription rejected: "${rejectedTranscript}"`);
+        return {
+          error: "無法確認參考音檔的實際內容",
+          code: "UPLOAD_FAILED",
+          details: "為避免生成亂語，請在首頁「您知道的音檔內容」盡量輸入這段素材說的原話後再生成；短片段也可以使用。",
+        };
       }
     }
     

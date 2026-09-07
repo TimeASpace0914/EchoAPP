@@ -181,41 +181,6 @@ export default function ResultScreen() {
     }
   }, [params.audioUri, customFileName, isDownloading]);
 
-  const handleDownloadAndShare = useCallback(async () => {
-    if (isDownloading) return;
-    const trimmed = customFileName.trim();
-    if (!trimmed) {
-      Alert.alert("提醒", "請輸入檔名");
-      return;
-    }
-    setIsDownloading(true);
-    try {
-      const fileName = `${trimmed}.wav`;
-      const result = await saveAudioToDevice(params.audioUri, fileName);
-      if (result.success) {
-        setShowDownloadModal(false);
-        // 直接開啟分享對話框
-        if (Platform.OS === "web") {
-          if (!(await Sharing.isAvailableAsync())) {
-            Alert.alert("下載完成", `音檔「${fileName}」已儲存，但此平台不支援分享功能`);
-            return;
-          }
-        }
-        await Sharing.shareAsync(params.audioUri, {
-          dialogTitle: "分享親友的聲音",
-          mimeType: "audio/wav",
-          UTI: "com.microsoft.waveform",
-        });
-      } else {
-        Alert.alert("下載失敗", result.error || "無法下載此音檔，請重試");
-      }
-    } catch {
-      Alert.alert("操作失敗", "無法完成此操作，請重試");
-    } finally {
-      setIsDownloading(false);
-    }
-  }, [params.audioUri, customFileName, isDownloading]);
-
   const handleShare = useCallback(async () => {
     if (isSharing) return;
     setIsSharing(true);
@@ -572,34 +537,22 @@ export default function ResultScreen() {
               />
               <Text style={{ fontSize: 15, color: colors.muted, flexShrink: 0 }}>.wav</Text>
             </View>
-            <View style={[styles.modalButtons, { flexDirection: "column", gap: 8 }]}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <TouchableOpacity
-                  onPress={() => setShowDownloadModal(false)}
-                  activeOpacity={0.7}
-                  style={[styles.modalButton, { borderColor: colors.border, backgroundColor: colors.background, flex: 1 }]}
-                >
-                  <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleDownloadConfirm}
-                  disabled={isDownloading}
-                  activeOpacity={0.7}
-                  style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary, flex: 1, opacity: isDownloading ? 0.6 : 1 }]}
-                >
-                  <Text style={[styles.modalButtonTextActive, { color: colors.background }]}>
-                    {isDownloading ? "儲存中..." : "儲存到手機"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            <View style={[styles.modalButtons, { gap: 8 }]}>
               <TouchableOpacity
-                onPress={handleDownloadAndShare}
+                onPress={() => setShowDownloadModal(false)}
+                activeOpacity={0.7}
+                style={[styles.modalButton, { borderColor: colors.border, backgroundColor: colors.background }]}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.muted }]}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDownloadConfirm}
                 disabled={isDownloading}
                 activeOpacity={0.7}
-                style={[styles.modalButton, { backgroundColor: colors.background, borderColor: colors.primary, borderWidth: 1.5, opacity: isDownloading ? 0.6 : 1 }]}
+                style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary, opacity: isDownloading ? 0.6 : 1 }]}
               >
-                <Text style={[styles.modalButtonText, { color: colors.primary, fontWeight: "600" }]}>
-                  {isDownloading ? "處理中..." : "儲存並分享到社群"}
+                <Text style={[styles.modalButtonTextActive, { color: colors.background }]}>
+                  {isDownloading ? "儲存中..." : "儲存到手機"}
                 </Text>
               </TouchableOpacity>
             </View>

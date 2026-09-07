@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getReferenceQualityRejection, getReferenceQualityWarnings } from "../server/voicebox";
+import {
+  getReferenceQualityRejection,
+  getReferenceQualityWarnings,
+  isUsableChineseReferenceText,
+} from "../server/voicebox";
 
 describe("getReferenceQualityRejection", () => {
   it("allows short references with a clear quality reminder", () => {
@@ -34,5 +38,12 @@ describe("getReferenceQualityRejection", () => {
     });
 
     expect(result?.code).toBe("QUALITY_REJECTED");
+  });
+
+  it("only accepts a useful CJK transcript as automatic reference text", () => {
+    expect(isUsableChineseReferenceText("今天有沒有好好吃飯")).toBe(true);
+    expect(isUsableChineseReferenceText("by bwd6")).toBe(false);
+    expect(isUsableChineseReferenceText("嗯")).toBe(false);
+    expect(isUsableChineseReferenceText(null)).toBe(false);
   });
 });
