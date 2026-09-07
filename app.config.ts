@@ -31,7 +31,8 @@ const env = {
   appName: "迴響",
   appSlug: "echo-voice-app",
   // 迴響音波 App Icon 的專案持久化資產 URL
-  logoUrl: "/manus-storage/echo-voice-wave-app-icon_d0d1c62a.png",
+  // 使用者指定的迴響 ICON 已同步至 assets/images 下的各平台圖示。
+  logoUrl: "",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -55,7 +56,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#F7F4EC",
+      backgroundColor: "#151515",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -112,7 +113,7 @@ const config: ExpoConfig = {
         resizeMode: "contain",
         backgroundColor: "#EFEFEF",
         dark: {
-          backgroundColor: "#1E1E1E",
+      backgroundColor: "#151515",
         },
       },
     ],
