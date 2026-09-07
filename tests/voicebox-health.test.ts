@@ -24,7 +24,7 @@ describe("Voicebox health endpoint", () => {
       expect(data.url).toBeDefined();
       expect(typeof data.profileCount).toBe("number");
     }
-  });
+  }, 15000);
 
   it("should have VOICEBOX_URL environment variable set", () => {
     // This verifies the secret was properly configured

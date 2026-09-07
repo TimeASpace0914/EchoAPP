@@ -815,7 +815,8 @@ export async function checkVoiceboxHealth(): Promise<{
   try {
     const response = await fetchWithRetry(`${url}/profiles`, {
       headers: NGROK_HEADERS,
-    }, 15000, 1);
+    // 健康檢查只負責快速回報連線狀態；不應因重試而卡住首頁或 API 測試。
+    }, 6000, 0);
 
     if (response.ok) {
       const profiles = await response.json() as VoiceboxProfile[];

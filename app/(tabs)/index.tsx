@@ -40,6 +40,17 @@ import {
 } from "@/lib/voice-profile-store";
 
 const MAX_TEXT_LENGTH = 500;
+const ACTIVE_PROFILE_LOOKUP_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 const EMOTION_OPTIONS = [
   { label: "溫柔", value: "溫柔深情，聲線柔軟，句尾微微放慢，讓關懷清楚可聽見" },
@@ -107,19 +118,24 @@ export default function HomeScreen() {
     setIsLoadingProfile(true);
     setProfileError(null);
     try {
-      const [remoteProfiles, activeProfileId] = await Promise.all([
-        getVoiceboxProfiles(),
-        getActiveVoiceProfileId(),
-      ]);
+      const [remoteProfiles, activeProfileId] = await withTimeout(
+        Promise.all([getVoiceboxProfiles(), getActiveVoiceProfileId()]),
+        ACTIVE_PROFILE_LOOKUP_TIMEOUT_MS,
+        "確認正式聲音設定逾時",
+      );
       const managedProfiles = await getManagedVoiceProfiles(remoteProfiles);
       const profile = managedProfiles.find((item) => item.id === activeProfileId && item.status === "approved") ?? null;
       setActiveProfile(profile);
       if (activeProfileId && !profile) {
         setProfileError("正式聲音設定需要由管理者重新確認。請聯繫服務人員協助。 ");
       }
-    } catch {
+    } catch (error) {
       setActiveProfile(null);
-      setProfileError("暫時無法讀取聲音設定，請確認連線後再試。 ");
+      setProfileError(
+        error instanceof Error && error.message === "確認正式聲音設定逾時"
+          ? "暫時無法確認正式聲音；您仍可直接上傳授權素材後生成。"
+          : "暫時無法讀取聲音設定；您仍可直接上傳授權素材後生成。",
+      );
     } finally {
       setIsLoadingProfile(false);
     }
@@ -128,7 +144,10 @@ export default function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
     const timeout = setTimeout(() => {
-      if (!cancelled) setVoiceboxOnline(false);
+      if (!cancelled) {
+        setVoiceboxOnline(false);
+        setIsLoadingProfile(false);
+      }
     }, 5000);
     checkVoiceboxStatus().then((status) => {
       if (!cancelled) {
@@ -423,7 +442,7 @@ export default function HomeScreen() {
                 <TouchableOpacity onPress={() => { setGenError(null); generationStore.reset(); }} style={[styles.dismissButton, { borderColor: colors.border }]}><Text style={[styles.dismissButtonText, { color: colors.foreground }]}>關閉</Text></TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity onPress={handleGenerate} disabled={(!activeProfile && !referenceAudioUri) || isLoadingProfile} activeOpacity={0.85} style={[styles.generateButton, { backgroundColor: colors.primary, opacity: (activeProfile || referenceAudioUri) && !isLoadingProfile ? 1 : 0.4 }]}><Text style={[styles.generateButtonText, { color: colors.background }]}>{isLoadingProfile ? "確認聲音設定中..." : activeProfile || referenceAudioUri ? "生成語音" : "等待聲音設定"}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={handleGenerate} disabled={!activeProfile && !referenceAudioUri} activeOpacity={0.85} style={[styles.generateButton, { backgroundColor: colors.primary, opacity: activeProfile || referenceAudioUri ? 1 : 0.4 }]}><Text style={[styles.generateButtonText, { color: colors.background }]}>{referenceAudioUri || activeProfile ? "生成語音" : isLoadingProfile ? "確認聲音設定中..." : "等待聲音設定"}</Text></TouchableOpacity>
             )}
           </ScrollView>
         </Animated.View>

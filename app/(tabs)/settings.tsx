@@ -62,7 +62,7 @@ export default function SettingsScreen() {
   const openDeveloperOptions = () => navigateTo(developerUnlocked ? "developer" : "developer-lock");
 
   const menuItems = [
-    { icon: "info.circle" as const, label: "關於迴響", subtitle: "了解應用理念與技術", onPress: () => navigateTo("about") },
+    { icon: "info.circle" as const, label: "關於迴響", subtitle: "了解服務理念與使用原則", onPress: () => navigateTo("about") },
     { icon: "person.fill" as const, label: "隱私政策", subtitle: "了解聲音資料的使用原則", onPress: () => navigateTo("privacy") },
     { icon: "gear" as const, label: "使用說明", subtitle: "家屬快速上手指南", onPress: () => navigateTo("usage") },
     { icon: "gear" as const, label: "開發者選項", subtitle: "聲音身份、候選預覽與品質核可", onPress: openDeveloperOptions },
@@ -75,10 +75,10 @@ export default function SettingsScreen() {
         迴響希望以經過授權的聲音記憶，陪伴家屬在思念與告別之間，保留親友曾經帶來的溫度與關懷。
       </InfoCard>
       <InfoCard title="技術說明" colors={colors}>
-        APP 透過固定的安全傳輸入口連接管理者 Windows 電腦上的本機 Voicebox 服務。模型、Profile 與音檔管理應由授權管理者妥善控管。
+        迴響使用 AI 語音克隆技術，依據經授權的聲音素材製作仿製語音，讓家屬可輸入想說的話並生成語音訊息。素材的清晰度、說話時長與環境干擾，都會影響生成結果。
       </InfoCard>
       <InfoCard title="使用提醒" colors={colors}>
-        生成內容為 AI 模擬語音，並非親友真實發聲。請以尊重、審慎的態度使用，且確認已取得聲音使用授權。
+        生成內容為 AI 製作的仿製語音，並非親友真實發聲。請以尊重、審慎的態度使用，且確認已取得聲音使用授權。
       </InfoCard>
     </ScrollView>
   );
@@ -90,10 +90,10 @@ export default function SettingsScreen() {
         請僅使用已取得家屬或權利人同意的聲音。不可擷取網紅、名人或其他可識別真人的未授權語音進行克隆。
       </InfoCard>
       <InfoCard title="音檔處理" colors={colors}>
-        參考音檔會傳送至管理者 Windows 電腦上的本機 Voicebox 服務，以建立或使用聲音 Profile。Tunnel 僅負責傳輸，並非將模型搬到雲端運算。
+        經授權的參考音檔會用於建立或使用相對應的聲音設定，以製作本次仿製語音。管理者應依服務流程妥善保管、備份與刪除相關資料。
       </InfoCard>
       <InfoCard title="資料保護" colors={colors}>
-        家屬音檔、Voicebox Profile、Tunnel 憑證與 Windows 模型資料不可提交到 GitHub；請依搬遷指南進行安全備份與刪除管理。
+        家屬音檔與聲音設定屬於敏感資料，不應公開分享或與未授權人員共用。服務人員應在完成服務後依內部規範進行保管或刪除管理。
       </InfoCard>
     </ScrollView>
   );
@@ -138,7 +138,7 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={unlockDeveloperOptions} activeOpacity={0.85} style={[styles.unlockButton, { backgroundColor: colors.primary }]}>
           <Text style={[styles.unlockButtonText, { color: colors.background }]}>解鎖開發者選項</Text>
         </TouchableOpacity>
-        <Text style={[styles.lockFootnote, { color: colors.muted }]}>此功能為 APP 操作介面鎖，目的在降低一般家屬誤操作的風險；Windows 主機與 Voicebox 管理權限仍應獨立控管。</Text>
+        <Text style={[styles.lockFootnote, { color: colors.muted }]}>此功能為 APP 操作介面鎖，目的在降低一般家屬誤操作的風險；電腦端服務與管理權限仍應獨立控管。</Text>
       </View>
     </ScrollView>
   );
