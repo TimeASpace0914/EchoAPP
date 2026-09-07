@@ -70,6 +70,28 @@ export interface VoiceGenerationResult {
   profileId: string;
 }
 
+export interface VoiceProfileCreationParams {
+  /** 授權參考音檔 URI */
+  referenceAudioUri: string;
+  /** 音檔 MIME type（由 DocumentPicker 提供） */
+  audioMimeType?: string;
+  /** 原始檔名（用於推導格式與顯示） */
+  audioFileName?: string;
+  /** 與參考音檔逐字相符的文字 */
+  referenceText?: string;
+  /** Profile 的基礎語氣描述 */
+  personality?: string;
+  /** 供管理者辨識的聲音名稱或描述 */
+  description?: string;
+  /** 顯示建立進度 */
+  onProgress?: (progress: number, stage: string) => void;
+}
+
+export interface VoiceProfileCreationResult {
+  profileId: string;
+  name: string;
+}
+
 export interface VoiceboxProfileSummary {
   id: string;
   name: string;
@@ -437,6 +459,44 @@ async function restGenerateSpeech(
   }
 
   throw new Error("語音生成逾時（超過 30 分鐘），請確認本機 Voicebox 是否仍在運行後再試。");
+}
+
+/**
+ * 僅建立 Voicebox 候選 Profile，不產生家屬可見的語音結果。
+ * 開發者頁應在此後以固定三段預覽驗收，再決定是否核可為首頁使用的正式聲音。
+ */
+export async function createVoiceProfile(
+  params: VoiceProfileCreationParams,
+): Promise<VoiceProfileCreationResult> {
+  const { onProgress } = params;
+  if (onProgress) onProgress(10, "正在讀取授權參考音檔...");
+
+  const timestamp = Date.now();
+  const ext = getExtension(params.audioFileName || params.referenceAudioUri);
+  const mimeType = params.audioMimeType
+    || (ext === "mp3" ? "audio/mpeg"
+      : ext === "wav" ? "audio/wav"
+      : ext === "m4a" ? "audio/mp4"
+      : ext === "aac" ? "audio/aac"
+      : ext === "flac" ? "audio/flac"
+      : ext === "ogg" ? "audio/ogg"
+      : "audio/wav");
+
+  const stableInstruct = buildStableVoiceInstruct(params.personality);
+  const audioBase64 = await readAudioAsBase64(params.referenceAudioUri);
+  if (onProgress) onProgress(45, "正在檢查音檔品質並建立候選聲音...");
+
+  const uploadResult = await restUploadProfile(
+    `echo_${timestamp}`,
+    audioBase64,
+    mimeType,
+    params.referenceText,
+    stableInstruct,
+    params.description,
+  );
+
+  if (onProgress) onProgress(100, "候選聲音已建立");
+  return uploadResult;
 }
 
 /**

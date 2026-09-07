@@ -1,6 +1,7 @@
 import type { VoiceboxProfileSummary } from "@/lib/voice-service";
 
 const VOICE_PROFILE_STORE_KEY = "@echo_voice_profiles";
+const ACTIVE_VOICE_PROFILE_KEY = "@echo_active_voice_profile";
 
 export type VoiceProfileStatus = "candidate" | "approved";
 
@@ -51,6 +52,25 @@ async function readStoredVoiceProfiles(): Promise<StoredVoiceProfile[]> {
 async function writeStoredVoiceProfiles(profiles: StoredVoiceProfile[]) {
   const AsyncStorage = await import("@react-native-async-storage/async-storage");
   await AsyncStorage.default.setItem(VOICE_PROFILE_STORE_KEY, JSON.stringify(profiles));
+}
+
+/**
+ * 取得目前指定給首頁家屬生成流程的正式 Profile。
+ * 此值只保存 Profile ID；實際是否存在且已核可，仍需與 Voicebox 列表合併後檢查。
+ */
+export async function getActiveVoiceProfileId(): Promise<string | null> {
+  const AsyncStorage = await import("@react-native-async-storage/async-storage");
+  return AsyncStorage.default.getItem(ACTIVE_VOICE_PROFILE_KEY);
+}
+
+/** 將已核可 Profile 指定為首頁唯一可重用的正式聲音；傳入 null 可清除指定。 */
+export async function setActiveVoiceProfileId(profileId: string | null) {
+  const AsyncStorage = await import("@react-native-async-storage/async-storage");
+  if (profileId) {
+    await AsyncStorage.default.setItem(ACTIVE_VOICE_PROFILE_KEY, profileId);
+    return;
+  }
+  await AsyncStorage.default.removeItem(ACTIVE_VOICE_PROFILE_KEY);
 }
 
 /**
