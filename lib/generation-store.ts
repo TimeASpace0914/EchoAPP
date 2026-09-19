@@ -5,8 +5,7 @@
  * 使用模組級單例模式，狀態在整個 APP 生命週期內持久存在。
  */
 
-import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { sendGenerationNotification } from "@/lib/generation-notifications";
 
 export type GenerationStatus = "idle" | "uploading" | "generating" | "completed" | "error";
 
@@ -144,37 +143,19 @@ class GenerationStoreClass {
   }
 
   private async sendCompletionNotification() {
-    if (Platform.OS === "web") return;
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "語音生成完成",
-          body: "親友的聲音已準備好，點擊查看",
-          sound: true,
-          data: { type: "generation_complete" },
-        },
-        trigger: null, // 立即發送
-      });
-    } catch (e) {
-      console.warn("[GenerationStore] 通知發送失敗:", e);
-    }
+    await sendGenerationNotification({
+      title: "語音生成完成",
+      body: "親友的聲音已準備好，點擊查看",
+      data: { type: "generation_complete" },
+    });
   }
 
   private async sendErrorNotification(error: string) {
-    if (Platform.OS === "web") return;
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "語音生成失敗",
-          body: error.substring(0, 100),
-          sound: true,
-          data: { type: "generation_error" },
-        },
-        trigger: null,
-      });
-    } catch (e) {
-      console.warn("[GenerationStore] 錯誤通知發送失敗:", e);
-    }
+    await sendGenerationNotification({
+      title: "語音生成失敗",
+      body: error.substring(0, 100),
+      data: { type: "generation_error" },
+    });
   }
 }
 

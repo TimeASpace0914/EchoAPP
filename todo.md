@@ -357,6 +357,7 @@
 
 - [x] 恢復 Expo 開發伺服器並驗證 iOS Bundle 可存取
 - [x] 重新啟動停止回應的開發伺服器並驗證 Expo Go 存取
+- [x] 修正 Android Expo Go（SDK 53+）載入 expo-notifications 時出現的紅色錯誤畫面：通知模組改為僅在原生開發版／正式版動態載入，Expo Go 可正常開啟並略過完成通知
 
 ## Voicebox Qwen 推論錯誤修復
 
