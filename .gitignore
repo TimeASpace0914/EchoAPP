@@ -1,70 +1,83 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies and package-manager caches
 node_modules/
+.pnpm-store/
 
-# Expo
+# Local environment files and credentials
+# Keep only explicitly versioned examples, never machine-specific values.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+credentials.json
+*credentials*.json
+cloudflared*.json
+*.tunnel.json
+secrets*.json
+google-services.json
+GoogleService-Info.plist
+.cloudflared/
+
+# Expo, Metro, generated builds, and native prebuild output
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
 .metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
 /ios
 /android
 
-# IDE
+# Local Voicebox evaluation outputs and family media
+# Do not commit voice biometrics, reference recordings, or derived transcripts.
+test-output-*
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.wma
+*.mp4
+*.mov
+*.m4v
+*.3gp
+*.webm
+
+# Test, build, and archive artifacts
+coverage/
+.cache/
+*.tsbuildinfo
+*.tgz
+*.tar.gz
+
+# Logs and platform-specific workspace metadata
+logs/
+*.log
+.webdev/
+.manus/
+.manus-logs/
+.project-config.json
+
+# IDE and operating-system files
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 *~
-
-# Logs
-logs
-*.log
-
-# OS
+.DS_Store
 Thumbs.db
 
-# Build files
-*.tgz
-*.tar.gz
-.cache/
+# Temporary merge/editor files
+*.orig
+*.orig.*
 
-# Webdev artifacts (checkpoint zips, migrations, etc.)
-.webdev/
-.project-config.json
-.manus-logs/
-
-# Sandbox-specific config
-.project-config.json
+# Template/example workspace
+app-example/
